@@ -1,0 +1,42 @@
+import 'package:flutter/material.dart';
+
+/// Req. 18, 38: categorías y tipos de contenido.
+class MenuScreen extends StatelessWidget {
+  const MenuScreen({super.key});
+
+  static const categorias = ['Comedia', 'Suspenso', 'Acción', 'Infantil', 'Romance'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Menú')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          ...categorias.map(
+            (c) => Card(
+              child: ListTile(
+                title: Text(c),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  // TODO: navegar al listado filtrado por categoría.
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text('Tipo', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: const [
+              Chip(label: Text('Películas')),
+              Chip(label: Text('Series')),
+              Chip(label: Text('Documentales')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

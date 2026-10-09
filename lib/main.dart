@@ -15,6 +15,7 @@ class StreamingApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF3D5A80),
         useMaterial3: true,
       ),
+      // TODO: una vez tengas el login real, navega a HomeScreen tras autenticar.
       home: const LoginScreen(),
     );
   }

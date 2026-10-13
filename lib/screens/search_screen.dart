@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'player_screen.dart';
+import 'content_detail_screen.dart';
 
 /// Req. 36, 37: búsqueda y filtros.
 class SearchScreen extends StatelessWidget {
@@ -56,7 +56,7 @@ class SearchScreen extends StatelessWidget {
                 itemBuilder: (_, __) => GestureDetector(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const PlayerScreen()),
+                    MaterialPageRoute(builder: (_) => const ContentDetailScreen()),
                   ),
                   child: Container(
                     decoration: BoxDecoration(

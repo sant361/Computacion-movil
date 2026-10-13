@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'search_screen.dart';
 import 'menu_screen.dart';
-import 'player_screen.dart';
+import 'content_detail_screen.dart';
 import 'payments/subscription_screen.dart';
+import 'catalog/notifications_screen.dart';
+import 'catalog/downloads_screen.dart';
 
 /// Req. 17, 28, 39: pantalla de inicio con sugerencias, seguir viendo y recomendaciones.
 class HomeScreen extends StatelessWidget {
@@ -23,7 +25,7 @@ class HomeScreen extends StatelessWidget {
             itemBuilder: (_, __) => GestureDetector(
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PlayerScreen()),
+                MaterialPageRoute(builder: (_) => const ContentDetailScreen()),
               ),
               child: Container(
                 width: 90,
@@ -50,6 +52,22 @@ class HomeScreen extends StatelessWidget {
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuScreen())),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'Notificaciones',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.download_outlined),
+            tooltip: 'Descargas',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DownloadsScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
             tooltip: 'Mi suscripción',

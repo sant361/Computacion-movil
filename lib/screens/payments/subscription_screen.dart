@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'billing_screen.dart';
 import 'payment_methods_screen.dart';
 import 'plans_screen.dart';
+import '../account/security_screen.dart';
+import '../account/devices_screen.dart';
 
 /// Req. 14, 15, 16: estado de la suscripción, cambio y cancelación de plan.
 class SubscriptionScreen extends StatefulWidget {
@@ -82,6 +84,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             title: const Text('Facturación'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillingScreen())),
+          ),
+          const Divider(),
+          ListTile(
+            title: const Text('Seguridad'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SecurityScreen())),
+          ),
+          ListTile(
+            title: const Text('Dispositivos'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DevicesScreen())),
           ),
         ],
       ),

@@ -11,6 +11,8 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   bool _autoplay = true;
   bool _watchFromStart = true;
+  bool _inMyList = false;
+  bool? _liked;
 
   @override
   Widget build(BuildContext context) {
@@ -57,12 +59,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              IconButton(icon: const Icon(Icons.thumb_up_outlined), onPressed: () {}), // req. 31 calificación
-              IconButton(icon: const Icon(Icons.thumb_down_outlined), onPressed: () {}),
+              IconButton(
+                icon: Icon(_liked == true ? Icons.thumb_up : Icons.thumb_up_outlined),
+                onPressed: () => setState(() => _liked = _liked == true ? null : true),
+              ), // req. 31 calificación
+              IconButton(
+                icon: Icon(_liked == false ? Icons.thumb_down : Icons.thumb_down_outlined),
+                onPressed: () => setState(() => _liked = _liked == false ? null : false),
+              ),
               const Spacer(),
               OutlinedButton.icon(
-                onPressed: () {}, // req. 34 mi lista
-                icon: const Icon(Icons.favorite_border, size: 18),
+                onPressed: () {
+                  setState(() => _inMyList = !_inMyList);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(_inMyList ? 'Agregado a Mi lista' : 'Quitado de Mi lista')),
+                  );
+                }, // req. 34 mi lista
+                icon: Icon(_inMyList ? Icons.favorite : Icons.favorite_border, size: 18),
                 label: const Text('Lista'),
               ),
             ],
@@ -81,7 +94,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: () {}, // req. 48 compartir
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Enlace copiado para compartir')),
+              ), // req. 48 compartir
               icon: const Icon(Icons.share, size: 18),
               label: const Text('Compartir'),
             ),

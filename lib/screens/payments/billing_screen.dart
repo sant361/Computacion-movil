@@ -15,7 +15,12 @@ class BillingScreen extends StatelessWidget {
           child: ListTile(
             title: Text('Factura 0001${23 - i}'),
             subtitle: const Text('00/00/0000 · Pagada'),
-            trailing: IconButton(icon: const Icon(Icons.download), onPressed: () {}),
+            trailing: IconButton(
+              icon: const Icon(Icons.download),
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Descargando factura en PDF...')),
+              ),
+            ),
           ),
         ),
       ),

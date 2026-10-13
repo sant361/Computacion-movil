@@ -46,7 +46,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               Expanded(child: TextField(decoration: InputDecoration(hintText: 'Código promocional'))),
               const SizedBox(width: 8),
-              OutlinedButton(onPressed: () {}, child: const Text('Aplicar')),
+              OutlinedButton(
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Código aplicado (demo)')),
+                ),
+                child: const Text('Aplicar'),
+              ),
             ],
           ),
           SwitchListTile(

@@ -42,7 +42,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ),
           const SizedBox(height: 8),
           OutlinedButton(
-            onPressed: () {},
+            onPressed: () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('¿Cancelar tu plan?'),
+                  content: const Text(
+                    'Seguirás con acceso hasta el final del periodo ya pagado. Después no se renovará.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Mantener mi plan'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Confirmar cancelación', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true && context.mounted) {
+                // TODO: enviar la cancelación al backend.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Tu plan se cancelará al final del periodo')),
+                );
+              }
+            },
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Cancelar plan'),
           ),

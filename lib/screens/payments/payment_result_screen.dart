@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/primary_button.dart';
+import '../home_screen.dart';
 
 /// Req. 12: resultado del pago (aprobado / rechazado).
 class PaymentResultScreen extends StatelessWidget {
@@ -36,7 +37,17 @@ class PaymentResultScreen extends StatelessWidget {
               const Spacer(),
               PrimaryButton(
                 label: success ? 'IR AL INICIO' : 'REINTENTAR',
-                onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+                onPressed: () {
+                  if (success) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HomeScreen()),
+                      (route) => false,
+                    );
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
               ),
             ],
           ),

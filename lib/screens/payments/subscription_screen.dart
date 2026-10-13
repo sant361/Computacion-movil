@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'billing_screen.dart';
 import 'payment_methods_screen.dart';
+import 'plans_screen.dart';
 
 /// Req. 14, 15, 16: estado de la suscripción, cambio y cancelación de plan.
 class SubscriptionScreen extends StatefulWidget {
@@ -32,7 +33,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             onChanged: (v) => setState(() => _autoRenew = v),
             title: const Text('Renovación automática'),
           ),
-          OutlinedButton(onPressed: () {}, child: const Text('Cambiar plan')),
+          OutlinedButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PlansScreen()),
+            ),
+            child: const Text('Cambiar plan'),
+          ),
           const SizedBox(height: 8),
           OutlinedButton(
             onPressed: () {},

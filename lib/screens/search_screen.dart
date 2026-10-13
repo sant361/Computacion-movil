@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'player_screen.dart';
 
 /// Req. 36, 37: búsqueda y filtros.
 class SearchScreen extends StatelessWidget {
@@ -52,10 +53,16 @@ class SearchScreen extends StatelessWidget {
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
                 ),
-                itemBuilder: (_, __) => Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF0F4),
-                    borderRadius: BorderRadius.circular(8),
+                itemBuilder: (_, __) => GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PlayerScreen()),
+                  ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF0F4),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),

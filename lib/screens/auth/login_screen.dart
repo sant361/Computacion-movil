@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/primary_button.dart';
+import '../home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -60,9 +61,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 8),
-              PrimaryButton(label: 'LOGIN', onPressed: () {
-                // TODO: conectar con el backend de autenticación.
-              }),
+              PrimaryButton(
+                label: 'LOGIN',
+                onPressed: () {
+                  // TODO: validar credenciales contra el backend real.
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HomeScreen()),
+                  );
+                },
+              ),
               const SizedBox(height: 16),
               OutlinedButton(
                 onPressed: () {

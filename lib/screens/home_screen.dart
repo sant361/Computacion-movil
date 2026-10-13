@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'search_screen.dart';
 import 'menu_screen.dart';
+import 'player_screen.dart';
+import 'payments/subscription_screen.dart';
 
 /// Req. 17, 28, 39: pantalla de inicio con sugerencias, seguir viendo y recomendaciones.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  Widget _row(String title) {
+  Widget _row(BuildContext context, String title) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -18,11 +20,17 @@ class HomeScreen extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: 6,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (_, __) => Container(
-              width: 90,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEEF0F4),
-                borderRadius: BorderRadius.circular(8),
+            itemBuilder: (_, __) => GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PlayerScreen()),
+              ),
+              child: Container(
+                width: 90,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF0F4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ),
@@ -43,6 +51,14 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'Mi suscripción',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.search),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchScreen())),
           ),
@@ -51,9 +67,9 @@ class HomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _row('Sugerencias'),
-          _row('Seguir viendo'),
-          _row('Para ti'),
+          _row(context, 'Sugerencias'),
+          _row(context, 'Seguir viendo'),
+          _row(context, 'Para ti'),
         ],
       ),
     );

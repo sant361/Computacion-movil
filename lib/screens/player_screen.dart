@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'fullscreen_player_screen.dart';
 
 /// Req. 20-27, 29, 30, 34, 48: reproductor de video (Serie).
 ///
@@ -126,12 +127,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.fullscreen),
-                onPressed: () {
-                  // TODO: implementar pantalla completa (rotar a horizontal y ocultar la barra superior).
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pantalla completa (pendiente)')),
-                  );
-                },
+                onPressed: isReady
+                    ? () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FullscreenPlayerScreen(controller: _controller),
+                            fullscreenDialog: true,
+                          ),
+                        )
+                    : null,
               ),
             ],
           ),

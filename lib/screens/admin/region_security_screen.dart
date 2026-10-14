@@ -32,7 +32,7 @@ class _RegionSecurityScreenState extends State<RegionSecurityScreen> {
           const SizedBox(height: 4),
           const Text('Límite por plan: 4 dispositivos', style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () {}, child: const Text('Pantalla Dispositivos')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo dispositivos autorizados (demo)'))), child: const Text('Pantalla Dispositivos')),
           const Divider(height: 32),
           Card(
             color: const Color(0xFFFFF7E8),
@@ -47,7 +47,7 @@ class _RegionSecurityScreenState extends State<RegionSecurityScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () {}, child: const Text('Ver alertas de seguridad')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo alertas de seguridad (demo)'))), child: const Text('Ver alertas de seguridad')),
         ],
       ),
     );

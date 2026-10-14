@@ -21,7 +21,7 @@ class _PromotionsPanelScreenState extends State<PromotionsPanelScreen> {
       appBar: AppBar(
         title: const Text('Promociones'),
         actions: [
-          TextButton(onPressed: () {}, child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
+          TextButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de nueva promoción (demo)'))), child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
         ],
       ),
       body: ListView(
@@ -38,7 +38,7 @@ class _PromotionsPanelScreenState extends State<PromotionsPanelScreen> {
                 ),
               ),
           const Divider(height: 32),
-          OutlinedButton(onPressed: () {}, child: const Text('Configurar código nuevo')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de código nuevo (demo)'))), child: const Text('Configurar código nuevo')),
           const SizedBox(height: 16),
           const Center(
             child: Text('Los códigos vencidos no se pueden aplicar', style: TextStyle(fontSize: 11, color: Colors.grey)),

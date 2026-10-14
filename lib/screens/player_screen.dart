@@ -30,6 +30,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
           const SizedBox(height: 8),
           const LinearProgressIndicator(value: 0.3),
+          // TODO: estos controles son visuales; falta integrar un paquete real de
+          // video (por ejemplo video_player o chewie) para que reproduzcan el contenido.
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -53,7 +55,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             onChanged: (v) => setState(() => _autoplay = v),
             title: const Text('Autoplay'), // req. 27
           ),
-          OutlinedButton(onPressed: () {}, child: const Text('Siguiente episodio ▶')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reproduciendo siguiente episodio (demo)'))), child: const Text('Siguiente episodio ▶')),
           const SizedBox(height: 16),
           const Text('Serie · Temporada 1', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),

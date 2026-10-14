@@ -16,7 +16,7 @@ class PlansPanelScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Planes'),
         actions: [
-          TextButton(onPressed: () {}, child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
+          TextButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de nuevo plan (demo)'))), child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
         ],
       ),
       body: ListView(
@@ -31,8 +31,8 @@ class PlansPanelScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('${p['precio']}/mes'),
-                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () {}),
-                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () {}),
+                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editar plan (demo)')))),
+                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plan eliminado (demo)')))),
                   ],
                 ),
               ),

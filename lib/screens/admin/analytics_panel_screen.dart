@@ -36,7 +36,7 @@ class AnalyticsPanelScreen extends StatelessWidget {
           const ListTile(title: Text('Serie A'), trailing: Text('2400 vistas'), contentPadding: EdgeInsets.zero),
           const ListTile(title: Text('Película B'), trailing: Text('1200 vistas'), contentPadding: EdgeInsets.zero),
           const SizedBox(height: 16),
-          OutlinedButton(onPressed: () {}, child: const Text('Ver errores del sistema')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo registro de errores (demo)'))), child: const Text('Ver errores del sistema')),
         ],
       ),
     );

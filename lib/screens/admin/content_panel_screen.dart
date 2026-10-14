@@ -39,8 +39,8 @@ class ContentPanelScreen extends StatelessWidget {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () {}),
-                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () {}),
+                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editar contenido (demo)')))),
+                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contenido eliminado (demo)')))),
                   ],
                 ),
               ),
@@ -49,11 +49,11 @@ class ContentPanelScreen extends StatelessWidget {
           const Divider(height: 32),
           const Text('Temporadas y episodios', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () {}, child: const Text('Panel de temporadas')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo panel de temporadas (demo)'))), child: const Text('Panel de temporadas')),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () {}, child: const Text('Panel de episodios')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo panel de episodios (demo)'))), child: const Text('Panel de episodios')),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () {}, child: const Text('Formulario de carga multimedia')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo formulario de carga (demo)'))), child: const Text('Formulario de carga multimedia')),
           const SizedBox(height: 16),
           const Center(
             child: Text('Estados: borrador · revisión · programado', style: TextStyle(fontSize: 11, color: Colors.grey)),

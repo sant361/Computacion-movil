@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'catalog/profiles_screen.dart';
 import 'catalog/parental_control_screen.dart';
+import 'admin/admin_dashboard_screen.dart';
 
 /// Req. 18, 38: categorías y tipos de contenido.
 class MenuScreen extends StatelessWidget {
@@ -50,6 +51,13 @@ class MenuScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () =>
                 Navigator.push(context, MaterialPageRoute(builder: (_) => const ParentalControlScreen())),
+          ),
+          ListTile(
+            leading: const Icon(Icons.admin_panel_settings_outlined),
+            title: const Text('Panel de administrador'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () =>
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen())),
           ),
         ],
       ),

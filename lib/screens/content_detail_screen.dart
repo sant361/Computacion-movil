@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'player_screen.dart';
+import 'tokens/access_options_screen.dart';
 
 /// Req. 19: ficha de un contenido (serie/película) antes de reproducir.
 class ContentDetailScreen extends StatefulWidget {
@@ -82,6 +83,15 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  icon: const Icon(Icons.lock_outline, size: 18),
+                  label: const Text('Este episodio está restringido'),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AccessOptionsScreen()),
+                  ),
                 ),
               ]),
             ),

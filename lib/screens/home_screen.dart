@@ -5,6 +5,7 @@ import 'content_detail_screen.dart';
 import 'payments/subscription_screen.dart';
 import 'catalog/notifications_screen.dart';
 import 'catalog/downloads_screen.dart';
+import 'tokens/tokens_screen.dart';
 
 /// Req. 17, 28, 39: pantalla de inicio con sugerencias, seguir viendo y recomendaciones.
 class HomeScreen extends StatelessWidget {
@@ -52,6 +53,14 @@ class HomeScreen extends StatelessWidget {
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuScreen())),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.stars_outlined),
+            tooltip: 'Mis tokens',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TokensScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             tooltip: 'Notificaciones',

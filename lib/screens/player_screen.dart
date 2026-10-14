@@ -23,6 +23,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _watchFromStart = true;
   bool _inMyList = false;
   bool? _liked;
+  String _subtitles = 'Desactivados';
+  String _audioLang = 'Español';
+  String _quality = 'Auto';
 
   @override
   void initState() {
@@ -54,6 +57,37 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   void _toggleMute() {
     setState(() => _controller.setVolume(_controller.value.volume == 0 ? 1 : 0));
+  }
+
+  Future<void> _pickOption({
+    required String title,
+    required List<String> options,
+    required String current,
+    required ValueChanged<String> onSelected,
+  }) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            ...options.map(
+              (o) => RadioListTile(
+                value: o,
+                groupValue: current,
+                title: Text(o),
+                onChanged: (v) => Navigator.pop(context, v),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice != null) onSelected(choice);
   }
 
   String _formatDuration(Duration d) {
@@ -141,10 +175,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
           Wrap(
             spacing: 8,
-            children: const [
-              Chip(label: Text('CC')), // subtítulos — req. 29
-              Chip(label: Text('Audio')), // idioma de audio — req. 30
-              Chip(label: Text('Calidad')), // calidad de video — req. 26
+            children: [
+              ActionChip(
+                label: Text('CC: $_subtitles'), // req. 29 subtítulos
+                onPressed: () => _pickOption(
+                  title: 'Subtítulos',
+                  options: const ['Desactivados', 'Español', 'Inglés', 'Portugués'],
+                  current: _subtitles,
+                  onSelected: (v) => setState(() => _subtitles = v),
+                ),
+              ),
+              ActionChip(
+                label: Text('Audio: $_audioLang'), // req. 30 idioma de audio
+                onPressed: () => _pickOption(
+                  title: 'Idioma de audio',
+                  options: const ['Español', 'Inglés', 'Portugués'],
+                  current: _audioLang,
+                  onSelected: (v) => setState(() => _audioLang = v),
+                ),
+              ),
+              ActionChip(
+                label: Text('Calidad: $_quality'), // req. 26 calidad de video
+                onPressed: () => _pickOption(
+                  title: 'Calidad de video',
+                  options: const ['Auto', '480p', '720p', '1080p'],
+                  current: _quality,
+                  onSelected: (v) => setState(() => _quality = v),
+                ),
+              ),
             ],
           ),
           SwitchListTile(

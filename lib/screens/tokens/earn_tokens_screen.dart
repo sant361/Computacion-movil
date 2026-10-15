@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../state/app_state.dart';
 import 'games_screen.dart';
 
 /// Req. 77, 78: ver un anuncio a cambio de tokens.
@@ -33,7 +34,8 @@ class EarnTokensScreen extends StatelessWidget {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                // TODO: reproducir el anuncio real y acreditar tokens al backend.
+                // TODO: reproducir el anuncio real antes de acreditar los tokens.
+                appState.addTokens(50, reason: 'Anuncio visto');
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('+50 tokens acreditados')),
                 );

@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
+import '../../state/app_state.dart';
 import 'tokens_screen.dart';
 
 /// Req. 79, 80: resultado tras jugar un minijuego y tokens ganados.
-class GameResultScreen extends StatelessWidget {
+class GameResultScreen extends StatefulWidget {
   final String gameName;
   final int tokensEarned;
 
   const GameResultScreen({super.key, required this.gameName, required this.tokensEarned});
+
+  @override
+  State<GameResultScreen> createState() => _GameResultScreenState();
+}
+
+class _GameResultScreenState extends State<GameResultScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Se acreditan los tokens una sola vez, al entrar a la pantalla de resultado.
+    appState.addTokens(widget.tokensEarned, reason: 'Juego · ${widget.gameName}');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +34,7 @@ class GameResultScreen extends StatelessWidget {
               const SizedBox(height: 16),
               const Text('¡Buen trabajo!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text('Completaste $gameName', style: const TextStyle(color: Colors.grey)),
+              Text('Completaste ${widget.gameName}', style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 24),
               Card(
                 child: Padding(
@@ -32,7 +45,7 @@ class GameResultScreen extends StatelessWidget {
                       const Divider(),
                       _resultRow('Tiempo', '01:42'),
                       const Divider(),
-                      _resultRow('Tokens ganados', '+$tokensEarned'),
+                      _resultRow('Tokens ganados', '+${widget.tokensEarned}'),
                     ],
                   ),
                 ),

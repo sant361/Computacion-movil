@@ -14,8 +14,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AppState extends ChangeNotifier {
   static const _tokenBalanceKey = 'tokenBalance';
   static const _myListKey = 'myList';
+  static const _isLoggedInKey = 'isLoggedIn';
 
   SharedPreferences? _prefs;
+
+  bool _isLoggedIn = false;
+  bool get isLoggedIn => _isLoggedIn;
 
   int _tokenBalance = 1250;
   int get tokenBalance => _tokenBalance;
@@ -35,6 +39,7 @@ class AppState extends ChangeNotifier {
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
     _tokenBalance = _prefs!.getInt(_tokenBalanceKey) ?? _tokenBalance;
+    _isLoggedIn = _prefs!.getBool(_isLoggedInKey) ?? false;
     final savedList = _prefs!.getStringList(_myListKey);
     if (savedList != null) {
       _myList
@@ -48,6 +53,23 @@ class AppState extends ChangeNotifier {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     await prefs.setInt(_tokenBalanceKey, _tokenBalance);
     await prefs.setStringList(_myListKey, _myList.toList());
+  }
+
+  /// Marca la sesión como iniciada y lo recuerda en el dispositivo.
+  /// TODO: cuando haya backend real, aquí se validarían las credenciales
+  /// y se guardaría el token de sesión en vez de solo un booleano.
+  Future<void> login() async {
+    _isLoggedIn = true;
+    notifyListeners();
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setBool(_isLoggedInKey, true);
+  }
+
+  Future<void> logout() async {
+    _isLoggedIn = false;
+    notifyListeners();
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setBool(_isLoggedInKey, false);
   }
 
   void addTokens(int amount, {required String reason}) {

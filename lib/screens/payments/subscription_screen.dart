@@ -4,6 +4,8 @@ import 'payment_methods_screen.dart';
 import 'plans_screen.dart';
 import '../account/security_screen.dart';
 import '../account/devices_screen.dart';
+import '../../state/app_state.dart';
+import '../auth/login_screen.dart';
 
 /// Req. 14, 15, 16: estado de la suscripción, cambio y cancelación de plan.
 class SubscriptionScreen extends StatefulWidget {
@@ -95,6 +97,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             title: const Text('Dispositivos'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DevicesScreen())),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.red),
+            title: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
+            onTap: () async {
+              await appState.logout();
+              if (!context.mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
           ),
         ],
       ),

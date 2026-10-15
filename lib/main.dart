@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/home_screen.dart';
 import 'state/app_state.dart';
 
 void main() {
@@ -38,9 +39,7 @@ class _AppStartup extends StatelessWidget {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-        // TODO: una vez tengas el login real, revisa aquí si ya hay una sesión
-        // guardada y navega directo a HomeScreen en vez de pedir Login otra vez.
-        return const LoginScreen();
+        return appState.isLoggedIn ? const HomeScreen() : const LoginScreen();
       },
     );
   }

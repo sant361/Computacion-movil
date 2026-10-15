@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/primary_button.dart';
+import '../../state/app_state.dart';
 import '../home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -31,9 +32,11 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.text = 'Demo1234';
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: validar credenciales contra el backend real.
+      // TODO: validar credenciales contra el backend real antes de llamar a login().
+      await appState.login();
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),

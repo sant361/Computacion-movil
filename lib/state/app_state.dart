@@ -1,11 +1,22 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Estado compartido simple de la app (sin paquetes externos de estado).
 ///
 /// [appState] es una única instancia global: cualquier pantalla puede leer
 /// appState.tokenBalance, y escuchar cambios envolviendo su UI en un
 /// ListenableBuilder(listenable: appState, builder: (...) => ...).
+///
+/// El saldo de tokens y "Mi lista" se guardan en el almacenamiento local del
+/// dispositivo (shared_preferences), así que sobreviven a cerrar la app.
+/// El historial de movimientos de tokens NO se guarda (queda solo en memoria)
+/// para mantener esto simple; guardarlo sería el siguiente paso natural.
 class AppState extends ChangeNotifier {
+  static const _tokenBalanceKey = 'tokenBalance';
+  static const _myListKey = 'myList';
+
+  SharedPreferences? _prefs;
+
   int _tokenBalance = 1250;
   int get tokenBalance => _tokenBalance;
 
@@ -16,10 +27,34 @@ class AppState extends ChangeNotifier {
   ];
   List<Map<String, String>> get tokenHistory => List.unmodifiable(_tokenHistory);
 
+  final Set<String> _myList = {};
+  bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
+
+  /// Carga el estado guardado en el dispositivo. Llamar una vez al inicio,
+  /// antes de runApp(), para que la app abra ya con los datos reales.
+  Future<void> load() async {
+    _prefs = await SharedPreferences.getInstance();
+    _tokenBalance = _prefs!.getInt(_tokenBalanceKey) ?? _tokenBalance;
+    final savedList = _prefs!.getStringList(_myListKey);
+    if (savedList != null) {
+      _myList
+        ..clear()
+        ..addAll(savedList);
+    }
+    notifyListeners();
+  }
+
+  Future<void> _persist() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setInt(_tokenBalanceKey, _tokenBalance);
+    await prefs.setStringList(_myListKey, _myList.toList());
+  }
+
   void addTokens(int amount, {required String reason}) {
     _tokenBalance += amount;
     _tokenHistory.insert(0, {'titulo': reason, 'valor': '+$amount'});
     notifyListeners();
+    _persist();
   }
 
   bool spendTokens(int amount, {required String reason}) {
@@ -27,14 +62,9 @@ class AppState extends ChangeNotifier {
     _tokenBalance -= amount;
     _tokenHistory.insert(0, {'titulo': reason, 'valor': '-$amount'});
     notifyListeners();
+    _persist();
     return true;
   }
-
-  // "Mi lista": identifica cada contenido por su título. En una versión con
-  // backend real, esto sería el id del contenido en vez del título.
-  final Set<String> _myList = {};
-
-  bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
 
   void toggleMyList(String contentTitle) {
     if (_myList.contains(contentTitle)) {
@@ -43,6 +73,7 @@ class AppState extends ChangeNotifier {
       _myList.add(contentTitle);
     }
     notifyListeners();
+    _persist();
   }
 }
 

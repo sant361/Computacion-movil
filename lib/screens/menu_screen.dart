@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'catalog/profiles_screen.dart';
 import 'catalog/parental_control_screen.dart';
 import 'admin/admin_dashboard_screen.dart';
+import 'search_screen.dart';
 
 /// Req. 18, 38: categorías y tipos de contenido.
 class MenuScreen extends StatelessWidget {
@@ -21,9 +22,10 @@ class MenuScreen extends StatelessWidget {
               child: ListTile(
                 title: Text(c),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // TODO: navegar al listado filtrado por categoría.
-                },
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => SearchScreen(initialGenre: c)),
+                ),
               ),
             ),
           ),

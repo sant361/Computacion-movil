@@ -61,23 +61,44 @@ class ContentDetailScreen extends StatelessWidget {
                   listenable: appState,
                   builder: (context, _) {
                     final inMyList = appState.isInMyList(title);
-                    return Row(
+                    final downloaded = appState.isDownloaded(title);
+                    return Column(
                       children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: Icon(inMyList ? Icons.favorite : Icons.favorite_border),
-                            label: Text(inMyList ? 'En mi lista' : '+ Mi lista'),
-                            onPressed: () => appState.toggleMyList(title),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.share),
-                            label: const Text('Compartir'),
-                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Enlace copiado para compartir')),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: Icon(inMyList ? Icons.favorite : Icons.favorite_border),
+                                label: Text(inMyList ? 'En mi lista' : '+ Mi lista'),
+                                onPressed: () => appState.toggleMyList(title),
+                              ),
                             ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.share),
+                                label: const Text('Compartir'),
+                                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Enlace copiado para compartir')),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            icon: Icon(downloaded ? Icons.check_circle : Icons.download_outlined),
+                            label: Text(downloaded ? 'Descargado' : 'Descargar'),
+                            onPressed: downloaded
+                                ? null
+                                : () {
+                                    appState.downloadContent(title);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Descarga completa')),
+                                    );
+                                  },
                           ),
                         ),
                       ],

@@ -15,6 +15,7 @@ class AppState extends ChangeNotifier {
   static const _tokenBalanceKey = 'tokenBalance';
   static const _myListKey = 'myList';
   static const _isLoggedInKey = 'isLoggedIn';
+  static const _downloadsKey = 'downloads';
 
   SharedPreferences? _prefs;
 
@@ -34,6 +35,12 @@ class AppState extends ChangeNotifier {
   final Set<String> _myList = {};
   bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
 
+  // Descargas: por simplicidad se marcan como completas al instante
+  // (no hay una descarga real en progreso, es solo para la demo).
+  final Set<String> _downloads = {};
+  List<String> get downloads => List.unmodifiable(_downloads);
+  bool isDownloaded(String contentTitle) => _downloads.contains(contentTitle);
+
   /// Carga el estado guardado en el dispositivo. Llamar una vez al inicio,
   /// antes de runApp(), para que la app abra ya con los datos reales.
   Future<void> load() async {
@@ -46,6 +53,12 @@ class AppState extends ChangeNotifier {
         ..clear()
         ..addAll(savedList);
     }
+    final savedDownloads = _prefs!.getStringList(_downloadsKey);
+    if (savedDownloads != null) {
+      _downloads
+        ..clear()
+        ..addAll(savedDownloads);
+    }
     notifyListeners();
   }
 
@@ -53,6 +66,19 @@ class AppState extends ChangeNotifier {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     await prefs.setInt(_tokenBalanceKey, _tokenBalance);
     await prefs.setStringList(_myListKey, _myList.toList());
+    await prefs.setStringList(_downloadsKey, _downloads.toList());
+  }
+
+  void downloadContent(String contentTitle) {
+    _downloads.add(contentTitle);
+    notifyListeners();
+    _persist();
+  }
+
+  void removeDownload(String contentTitle) {
+    _downloads.remove(contentTitle);
+    notifyListeners();
+    _persist();
   }
 
   /// Marca la sesión como iniciada y lo recuerda en el dispositivo.

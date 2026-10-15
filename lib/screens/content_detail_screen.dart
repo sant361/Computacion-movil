@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
 import 'player_screen.dart';
 import 'tokens/access_options_screen.dart';
+import '../state/app_state.dart';
 
 /// Req. 19: ficha de un contenido (serie/película) antes de reproducir.
-class ContentDetailScreen extends StatefulWidget {
+class ContentDetailScreen extends StatelessWidget {
   final String title;
   const ContentDetailScreen({super.key, this.title = 'Título de la serie'});
-
-  @override
-  State<ContentDetailScreen> createState() => _ContentDetailScreenState();
-}
-
-class _ContentDetailScreenState extends State<ContentDetailScreen> {
-  bool _inMyList = false;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +27,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
             padding: const EdgeInsets.all(16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                Text(widget.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 const Text('2026 · 3 temporadas · +14', style: TextStyle(color: Colors.grey)),
                 const SizedBox(height: 8),
@@ -58,31 +52,37 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                     label: const Text('REPRODUCIR'),
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const PlayerScreen()),
+                      MaterialPageRoute(builder: (_) => PlayerScreen(contentTitle: title)),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: Icon(_inMyList ? Icons.favorite : Icons.favorite_border),
-                        label: Text(_inMyList ? 'En mi lista' : '+ Mi lista'),
-                        onPressed: () => setState(() => _inMyList = !_inMyList),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.share),
-                        label: const Text('Compartir'),
-                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Enlace copiado para compartir')),
+                ListenableBuilder(
+                  listenable: appState,
+                  builder: (context, _) {
+                    final inMyList = appState.isInMyList(title);
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: Icon(inMyList ? Icons.favorite : Icons.favorite_border),
+                            label: Text(inMyList ? 'En mi lista' : '+ Mi lista'),
+                            onPressed: () => appState.toggleMyList(title),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.share),
+                            label: const Text('Compartir'),
+                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Enlace copiado para compartir')),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextButton.icon(

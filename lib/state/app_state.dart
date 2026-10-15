@@ -29,6 +29,21 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     return true;
   }
+
+  // "Mi lista": identifica cada contenido por su título. En una versión con
+  // backend real, esto sería el id del contenido en vez del título.
+  final Set<String> _myList = {};
+
+  bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
+
+  void toggleMyList(String contentTitle) {
+    if (_myList.contains(contentTitle)) {
+      _myList.remove(contentTitle);
+    } else {
+      _myList.add(contentTitle);
+    }
+    notifyListeners();
+  }
 }
 
 /// Instancia única compartida por toda la app.

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'fullscreen_player_screen.dart';
+import '../state/app_state.dart';
 
 /// Req. 20-27, 29, 30, 34, 48: reproductor de video (Serie).
 ///
@@ -8,7 +9,8 @@ import 'fullscreen_player_screen.dart';
 /// contenido real sin depender de un backend. Para producción, reemplaza la
 /// URL de [_sampleVideoUrl] por la del video real del episodio.
 class PlayerScreen extends StatefulWidget {
-  const PlayerScreen({super.key});
+  final String contentTitle;
+  const PlayerScreen({super.key, this.contentTitle = 'Serie · Temporada 1'});
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -21,7 +23,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late final VideoPlayerController _controller;
   bool _autoplay = true;
   bool _watchFromStart = true;
-  bool _inMyList = false;
+
   bool? _liked;
   String _subtitles = 'Desactivados';
   String _audioLang = 'Español';
@@ -217,7 +219,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             child: const Text('Siguiente episodio ▶'),
           ),
           const SizedBox(height: 16),
-          const Text('Serie · Temporada 1', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(widget.contentTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -232,12 +234,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
               const Spacer(),
               OutlinedButton.icon(
                 onPressed: () {
-                  setState(() => _inMyList = !_inMyList);
+                  appState.toggleMyList(widget.contentTitle);
+                  setState(() {});
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(_inMyList ? 'Agregado a Mi lista' : 'Quitado de Mi lista')),
+                    SnackBar(
+                      content: Text(
+                        appState.isInMyList(widget.contentTitle) ? 'Agregado a Mi lista' : 'Quitado de Mi lista',
+                      ),
+                    ),
                   );
                 }, // req. 34 mi lista
-                icon: Icon(_inMyList ? Icons.favorite : Icons.favorite_border, size: 18),
+                icon: Icon(appState.isInMyList(widget.contentTitle) ? Icons.favorite : Icons.favorite_border,
+                    size: 18),
                 label: const Text('Lista'),
               ),
             ],

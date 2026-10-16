@@ -1,11 +1,15 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'state/app_state.dart';
 
-void main() {
-  // Asegura que los plugins (como shared_preferences) estén listos antes de usarlos.
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // firebase_options.dart lo genera "flutterfire configure" automáticamente
+  // con los datos de TU proyecto de Firebase; no se edita a mano.
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const StreamingApp());
 }
 

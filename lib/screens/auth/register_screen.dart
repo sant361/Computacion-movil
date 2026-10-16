@@ -1,8 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../widgets/primary_button.dart';
 import 'email_verification_screen.dart';
 
-/// Req. 1: registro de usuario.
+/// Req. 1: registro de usuario real con Firebase Authentication.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -17,6 +18,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _acceptedTerms = false;
+  bool _loading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -27,17 +30,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate() && _acceptedTerms) {
-      // TODO: enviar el registro al backend.
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: _emailController.text)),
-      );
-    } else if (!_acceptedTerms) {
+  String _mensajeDeError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'email-already-in-use':
+        return 'Ya existe una cuenta con ese correo.';
+      case 'invalid-email':
+        return 'El correo no tiene un formato válido.';
+      case 'weak-password':
+        return 'La contraseña es muy débil.';
+      default:
+        return 'No se pudo crear la cuenta (${e.code}).';
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_acceptedTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Debes autorizar el tratamiento de tus datos personales')),
       );
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      await credential.user?.updateDisplayName(_nameController.text.trim());
+      // Firebase ya puede enviar un correo de verificación real:
+      await credential.user?.sendEmailVerification();
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: _emailController.text.trim())),
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() => _errorMessage = _mensajeDeError(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -88,6 +125,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 validator: (v) =>
                     (v != _passwordController.text) ? 'Las contraseñas no coinciden' : null,
               ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
               CheckboxListTile(
                 value: _acceptedTerms,
                 onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
@@ -96,7 +137,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 16),
-              PrimaryButton(label: 'REGISTRARME', onPressed: _submit),
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : PrimaryButton(label: 'REGISTRARME', onPressed: _submit),
             ],
           ),
         ),

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'billing_screen.dart';
 import 'payment_methods_screen.dart';
@@ -103,6 +104,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
             onTap: () async {
+              await FirebaseAuth.instance.signOut();
               await appState.logout();
               if (!context.mounted) return;
               Navigator.pushAndRemoveUntil(

@@ -1,0 +1,31 @@
+name: Flutter CI
+
+# Corre automáticamente en cada push y en cada pull request hacia main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Analizar y probar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.0'
+          channel: 'stable'
+
+      - name: Instalar dependencias
+        run: flutter pub get
+
+      - name: Revisar el código (flutter analyze)
+        run: flutter analyze
+
+      - name: Correr las pruebas (flutter test)
+        run: flutter test

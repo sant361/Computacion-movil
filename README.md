@@ -35,3 +35,12 @@ Para correrlas, dentro de la carpeta del proyecto:
 ```
 flutter test
 ```
+
+## Integración continua (GitHub Actions)
+
+El archivo `.github/workflows/flutter-ci.yml` hace que GitHub corra automáticamente
+`flutter analyze` y `flutter test` cada vez que subes un cambio (`git push`) a la
+rama `main`, o cuando abres un pull request. Si algo falla, aparece una ❌ roja
+junto al commit en GitHub (en vez de enterarte solo cuando lo corres tú mismo
+en tu computador). Puedes ver el resultado en la pestaña **Actions** del
+repositorio en GitHub.

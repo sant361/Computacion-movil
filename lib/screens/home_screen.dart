@@ -27,7 +27,7 @@ class HomeScreen extends StatelessWidget {
         Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         SizedBox(
-          height: showProgress ? 100 : 90,
+          height: showProgress ? 122 : 106,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
@@ -45,7 +45,7 @@ class HomeScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        height: 60,
+                        height: 56,
                         decoration: BoxDecoration(
                           color: const Color(0xFFEEF0F4),
                           borderRadius: BorderRadius.circular(8),

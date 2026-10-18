@@ -1,10 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../widgets/primary_button.dart';
 import '../../state/app_state.dart';
 import '../home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
+
+const _demoEmail = 'usuario_demo@correo.com';
+const _demoPassword = 'Demo1234';
+const _demoAuthEnabled = bool.fromEnvironment('DEMO_AUTH_ENABLED');
 
 /// Req. 1, 2, 3, 5: inicio de sesión real con Firebase Authentication.
 class LoginScreen extends StatefulWidget {
@@ -31,10 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _autofill() {
-    // Cambia estos valores por un usuario de prueba que hayas creado en
-    // Firebase Authentication (consola de Firebase → Authentication → Users).
-    _emailController.text = 'usuario_demo@correo.com';
-    _passwordController.text = 'Demo1234';
+    _emailController.text = _demoEmail;
+    _passwordController.text = _demoPassword;
   }
 
   /// Traduce los códigos de error de Firebase a mensajes claros en español.
@@ -57,7 +60,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -65,6 +70,22 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      if (kIsWeb && _demoAuthEnabled) {
+        if (_emailController.text.trim() != _demoEmail ||
+            _passwordController.text != _demoPassword) {
+          setState(() => _errorMessage = 'Correo o contraseña incorrectos.');
+          return;
+        }
+
+        await appState.login();
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+        return;
+      }
+
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,

@@ -17,7 +17,7 @@ void main() {
   testWidgets('muestra los campos de usuario y contraseña, y el botón LOGIN', (tester) async {
     await pumpLogin(tester);
 
-    expect(find.text('Username'), findsOneWidget);
+    expect(find.text('Correo electrónico'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('LOGIN'), findsOneWidget);
   });
@@ -28,7 +28,7 @@ void main() {
     await tester.tap(find.text('LOGIN'));
     await tester.pump();
 
-    expect(find.text('Ingresa tu usuario'), findsOneWidget);
+    expect(find.text('Ingresa tu correo'), findsOneWidget);
     expect(find.text('Ingresa tu contraseña'), findsOneWidget);
   });
 
@@ -38,7 +38,7 @@ void main() {
     await tester.tap(find.text('Autocompletar datos'));
     await tester.pump();
 
-    expect(find.text('usuario_demo'), findsOneWidget);
+    expect(find.text('usuario_demo@correo.com'), findsOneWidget);
   });
 
   testWidgets('el ícono del ojo alterna si la contraseña se ve o no', (tester) async {

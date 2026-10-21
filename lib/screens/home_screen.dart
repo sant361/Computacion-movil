@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/catalog_item.dart';
+import '../state/app_state.dart';
 import 'catalog/downloads_screen.dart';
 import 'catalog/notifications_screen.dart';
 import 'content_detail_screen.dart';
@@ -10,13 +11,6 @@ import 'tokens/tokens_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  static final List<CatalogItem> _featured =
-      sampleCatalog.take(8).toList();
-  static final List<CatalogItem> _continueWatching =
-      sampleCatalog.skip(5).take(4).toList();
-  static final List<CatalogItem> _recommended =
-      sampleCatalog.reversed.take(8).toList();
 
   void _openItem(BuildContext context, CatalogItem item) {
     Navigator.push(
@@ -37,6 +31,19 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const background = Color(0xFF07111F);
+
+    return ListenableBuilder(
+      listenable: appState,
+      builder: (context, _) => _buildScaffold(context, background),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, Color background) {
+    final catalog = appState.catalog;
+    final featured = catalog.take(8).toList();
+    final continueWatching = catalog.skip(5).take(4).toList();
+    final recommended = catalog.reversed.take(8).toList();
+    final featuredItem = catalog.isEmpty ? null : catalog[20 % catalog.length];
 
     return Scaffold(
       backgroundColor: background,
@@ -128,27 +135,29 @@ class HomeScreen extends StatelessWidget {
             );
           }),
           const SizedBox(height: 16),
-          _FeaturedCard(item: sampleCatalog[20], onTap: () {
-            _openItem(context, sampleCatalog[20]);
-          }),
-          const SizedBox(height: 28),
+          if (featuredItem != null) ...[
+            _FeaturedCard(item: featuredItem, onTap: () {
+              _openItem(context, featuredItem);
+            }),
+            const SizedBox(height: 28),
+          ],
           _PosterSection(
             title: 'Series que podrían gustarte',
             action: 'Ver todo',
-            items: _featured,
+            items: featured,
             onItemTap: (item) => _openItem(context, item),
             onActionTap: () => _openSearch(context),
           ),
           const SizedBox(height: 12),
           _ContinueWatchingSection(
-            items: _continueWatching,
+            items: continueWatching,
             onItemTap: (item) => _openItem(context, item),
           ),
           const SizedBox(height: 12),
           _PosterSection(
             title: 'Elegidas para ti',
             action: 'Explorar',
-            items: _recommended,
+            items: recommended,
             onItemTap: (item) => _openItem(context, item),
             onActionTap: () => _openSearch(context),
           ),

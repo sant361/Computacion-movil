@@ -40,10 +40,17 @@ class StreamingApp extends StatelessWidget {
 class _AppStartup extends StatelessWidget {
   const _AppStartup();
 
+  Future<void> _startup() async {
+    await appState.load();
+    if (appState.isLoggedIn) {
+      await appState.loadCatalogFromFirestore();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
-      future: appState.load(),
+      future: _startup(),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));

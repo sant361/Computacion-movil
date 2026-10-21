@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../data/catalog_item.dart';
 
 /// Estado compartido simple de la app (sin paquetes externos de estado).
 ///
@@ -28,6 +30,11 @@ class AppState extends ChangeNotifier {
   String? _paymentUserId;
   List<Map<String, String>> _paymentMethods = [];
   List<Map<String, String>> get paymentMethods => List.unmodifiable(_paymentMethods);
+
+  // Mientras se carga desde Firestore (o si falla la conexión), la app
+  // muestra este catálogo de muestra para que nunca se vea vacía.
+  List<CatalogItem> _catalog = sampleCatalog;
+  List<CatalogItem> get catalog => List.unmodifiable(_catalog);
 
   bool _isLoggedIn = false;
   bool get isLoggedIn => _isLoggedIn;
@@ -224,6 +231,45 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     await _persistPaymentMethods();
+  }
+
+  /// Carga el catálogo desde la colección 'catalog' de Firestore.
+  ///
+  /// La primera vez que alguien abre la app con la base de datos vacía,
+  /// sube el catálogo de muestra a Firestore (así queda ahí para poder
+  /// editarlo luego desde la consola de Firebase, sin tocar código). Si
+  /// algo falla (sin internet, reglas de Firestore, etc.) se queda
+  /// mostrando el catálogo de muestra local en vez de dejar la app vacía.
+  Future<void> loadCatalogFromFirestore() async {
+    try {
+      final collection = FirebaseFirestore.instance.collection('catalog');
+      final snapshot = await collection.get();
+      if (snapshot.docs.isEmpty) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (final item in sampleCatalog) {
+          batch.set(collection.doc(), {
+            'title': item.title,
+            'genre': item.genre,
+            'year': item.year,
+          });
+        }
+        await batch.commit();
+        _catalog = sampleCatalog;
+      } else {
+        _catalog = snapshot.docs.map((doc) {
+          final data = doc.data();
+          return CatalogItem(
+            title: data['title'] as String? ?? '',
+            genre: data['genre'] as String? ?? '',
+            year: (data['year'] as num?)?.toInt() ?? 0,
+          );
+        }).toList();
+      }
+      notifyListeners();
+    } catch (_) {
+      // Sin conexión o sin permisos: se mantiene el catálogo de muestra
+      // local que ya estaba mostrando la app.
+    }
   }
 }
 

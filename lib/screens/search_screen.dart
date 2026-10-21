@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'content_detail_screen.dart';
 import '../data/catalog_item.dart';
+import '../state/app_state.dart';
 
 /// Req. 36, 37: búsqueda y filtros, con filtrado real sobre un catálogo de muestra.
 class SearchScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   List<CatalogItem> get _filtered {
     final query = _queryController.text.trim().toLowerCase();
-    return sampleCatalog.where((item) {
+    return appState.catalog.where((item) {
       final matchesQuery = query.isEmpty || item.title.toLowerCase().contains(query);
       final matchesGenre = _selectedGenres.isEmpty || _selectedGenres.contains(item.genre);
       return matchesQuery && matchesGenre;

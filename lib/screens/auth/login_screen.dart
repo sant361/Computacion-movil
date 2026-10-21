@@ -91,6 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
       await appState.login();
+      await appState.loadCatalogFromFirestore();
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

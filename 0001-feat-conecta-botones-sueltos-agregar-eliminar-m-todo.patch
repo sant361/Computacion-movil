@@ -1,0 +1,337 @@
+From b038199182117157208451395a89894569c18b0c Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Tue, 13 Oct 2026 20:53:52 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20conecta=20botones=20sueltos=20(agregar/?=
+ =?UTF-8?q?eliminar=20m=C3=A9todo=20de=20pago,=20cancelar=20plan,=20mi=20l?=
+ =?UTF-8?q?ista,=20compartir,=20calificaci=C3=B3n)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ .../payments/add_payment_method_screen.dart   | 76 +++++++++++++++++
+ lib/screens/payments/billing_screen.dart      |  7 +-
+ .../payments/payment_methods_screen.dart      | 81 ++++++++++++++-----
+ lib/screens/payments/payment_screen.dart      |  7 +-
+ lib/screens/payments/subscription_screen.dart | 28 ++++++-
+ lib/screens/player_screen.dart                | 25 ++++--
+ 6 files changed, 196 insertions(+), 28 deletions(-)
+ create mode 100644 lib/screens/payments/add_payment_method_screen.dart
+
+diff --git a/lib/screens/payments/add_payment_method_screen.dart b/lib/screens/payments/add_payment_method_screen.dart
+new file mode 100644
+index 0000000..81fdf6c
+--- /dev/null
++++ b/lib/screens/payments/add_payment_method_screen.dart
+@@ -0,0 +1,76 @@
++import 'package:flutter/material.dart';
++import '../../widgets/primary_button.dart';
++
++/// Req. 11: formulario para agregar un nuevo método de pago.
++class AddPaymentMethodScreen extends StatefulWidget {
++  const AddPaymentMethodScreen({super.key});
++
++  @override
++  State<AddPaymentMethodScreen> createState() => _AddPaymentMethodScreenState();
++}
++
++class _AddPaymentMethodScreenState extends State<AddPaymentMethodScreen> {
++  bool _saveAsDefault = true;
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Agregar método')),
++      body: Padding(
++        padding: const EdgeInsets.all(24),
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: [
++            const TextField(
++              decoration: InputDecoration(
++                prefixIcon: Icon(Icons.credit_card),
++                labelText: 'Número de tarjeta',
++              ),
++              keyboardType: TextInputType.number,
++            ),
++            const SizedBox(height: 12),
++            Row(
++              children: const [
++                Expanded(child: TextField(decoration: InputDecoration(labelText: 'MM/AA'))),
++                SizedBox(width: 12),
++                Expanded(child: TextField(decoration: InputDecoration(labelText: 'CVV'))),
++              ],
++            ),
++            const SizedBox(height: 12),
++            const TextField(decoration: InputDecoration(labelText: 'Nombre del titular')),
++            const SizedBox(height: 8),
++            CheckboxListTile(
++              value: _saveAsDefault,
++              onChanged: (v) => setState(() => _saveAsDefault = v ?? true),
++              title: const Text('Guardar como principal'),
++              controlAffinity: ListTileControlAffinity.leading,
++              contentPadding: EdgeInsets.zero,
++            ),
++            const SizedBox(height: 8),
++            const Text(
++              'Tus datos se guardan cifrados',
++              textAlign: TextAlign.center,
++              style: TextStyle(fontSize: 12, color: Colors.grey),
++            ),
++            const SizedBox(height: 24),
++            OutlinedButton(
++              onPressed: () => Navigator.pop(context),
++              child: const Text('Cancelar'),
++            ),
++            const SizedBox(height: 12),
++            PrimaryButton(
++              label: 'GUARDAR MÉTODO',
++              onPressed: () {
++                // TODO: validar y enviar los datos de la tarjeta al backend de pagos.
++                ScaffoldMessenger.of(context).showSnackBar(
++                  const SnackBar(content: Text('Método de pago guardado')),
++                );
++                Navigator.pop(context);
++              },
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/payments/billing_screen.dart b/lib/screens/payments/billing_screen.dart
+index a55ce5a..ba15b4e 100644
+--- a/lib/screens/payments/billing_screen.dart
++++ b/lib/screens/payments/billing_screen.dart
+@@ -15,7 +15,12 @@ class BillingScreen extends StatelessWidget {
+           child: ListTile(
+             title: Text('Factura 0001${23 - i}'),
+             subtitle: const Text('00/00/0000 · Pagada'),
+-            trailing: IconButton(icon: const Icon(Icons.download), onPressed: () {}),
++            trailing: IconButton(
++              icon: const Icon(Icons.download),
++              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
++                const SnackBar(content: Text('Descargando factura en PDF...')),
++              ),
++            ),
+           ),
+         ),
+       ),
+diff --git a/lib/screens/payments/payment_methods_screen.dart b/lib/screens/payments/payment_methods_screen.dart
+index 73d3909..ba8f6fd 100644
+--- a/lib/screens/payments/payment_methods_screen.dart
++++ b/lib/screens/payments/payment_methods_screen.dart
+@@ -1,39 +1,80 @@
+ import 'package:flutter/material.dart';
++import 'add_payment_method_screen.dart';
+ 
+ /// Req. 11: gestión de métodos de pago.
+-class PaymentMethodsScreen extends StatelessWidget {
++class PaymentMethodsScreen extends StatefulWidget {
+   const PaymentMethodsScreen({super.key});
+ 
++  @override
++  State<PaymentMethodsScreen> createState() => _PaymentMethodsScreenState();
++}
++
++class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
++  final List<Map<String, String>> _methods = [
++    {'nombre': 'Visa •••• 4242', 'detalle': 'Vence 08/28 · Principal'},
++    {'nombre': 'Mastercard •••• 1881', 'detalle': 'Vence 03/27'},
++    {'nombre': 'Billetera digital', 'detalle': 'Vinculada'},
++  ];
++
++  Future<void> _confirmDelete(int index) async {
++    final confirmed = await showDialog<bool>(
++      context: context,
++      builder: (_) => AlertDialog(
++        title: const Text('¿Eliminar este método?'),
++        content: Text('Se eliminará "${_methods[index]['nombre']}" de tu cuenta.'),
++        actions: [
++          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
++          TextButton(
++            onPressed: () => Navigator.pop(context, true),
++            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
++          ),
++        ],
++      ),
++    );
++    if (confirmed == true) {
++      setState(() => _methods.removeAt(index));
++    }
++  }
++
+   @override
+   Widget build(BuildContext context) {
+-    final methods = const [
+-      {'nombre': 'Visa •••• 4242', 'detalle': 'Vence 08/28 · Principal'},
+-      {'nombre': 'Mastercard •••• 1881', 'detalle': 'Vence 03/27'},
+-      {'nombre': 'Billetera digital', 'detalle': 'Vinculada'},
+-    ];
+     return Scaffold(
+       appBar: AppBar(title: const Text('Métodos de pago')),
+       body: ListView(
+         padding: const EdgeInsets.all(16),
+         children: [
+-          ...methods.map(
+-            (m) => Card(
+-              child: ListTile(
+-                leading: const Icon(Icons.credit_card),
+-                title: Text(m['nombre']!),
+-                subtitle: Text(m['detalle']!),
+-                trailing: Row(
+-                  mainAxisSize: MainAxisSize.min,
+-                  children: [
+-                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () {}),
+-                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () {}),
+-                  ],
++          ..._methods.asMap().entries.map(
++                (entry) => Card(
++                  child: ListTile(
++                    leading: const Icon(Icons.credit_card),
++                    title: Text(entry.value['nombre']!),
++                    subtitle: Text(entry.value['detalle']!),
++                    trailing: Row(
++                      mainAxisSize: MainAxisSize.min,
++                      children: [
++                        IconButton(
++                          icon: const Icon(Icons.edit, size: 18),
++                          onPressed: () {
++                            // TODO: abrir formulario de edición con los datos actuales.
++                          },
++                        ),
++                        IconButton(
++                          icon: const Icon(Icons.delete_outline, size: 18),
++                          onPressed: () => _confirmDelete(entry.key),
++                        ),
++                      ],
++                    ),
++                  ),
+                 ),
+               ),
++          const SizedBox(height: 8),
++          OutlinedButton(
++            onPressed: () => Navigator.push(
++              context,
++              MaterialPageRoute(builder: (_) => const AddPaymentMethodScreen()),
+             ),
++            child: const Text('+ Agregar método'),
+           ),
+-          const SizedBox(height: 8),
+-          OutlinedButton(onPressed: () {}, child: const Text('+ Agregar método')),
+         ],
+       ),
+     );
+diff --git a/lib/screens/payments/payment_screen.dart b/lib/screens/payments/payment_screen.dart
+index 2f56bc5..19c1a9b 100644
+--- a/lib/screens/payments/payment_screen.dart
++++ b/lib/screens/payments/payment_screen.dart
+@@ -46,7 +46,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
+             children: [
+               Expanded(child: TextField(decoration: InputDecoration(hintText: 'Código promocional'))),
+               const SizedBox(width: 8),
+-              OutlinedButton(onPressed: () {}, child: const Text('Aplicar')),
++              OutlinedButton(
++                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
++                  const SnackBar(content: Text('Código aplicado (demo)')),
++                ),
++                child: const Text('Aplicar'),
++              ),
+             ],
+           ),
+           SwitchListTile(
+diff --git a/lib/screens/payments/subscription_screen.dart b/lib/screens/payments/subscription_screen.dart
+index 31ea681..acd48ff 100644
+--- a/lib/screens/payments/subscription_screen.dart
++++ b/lib/screens/payments/subscription_screen.dart
+@@ -42,7 +42,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
+           ),
+           const SizedBox(height: 8),
+           OutlinedButton(
+-            onPressed: () {},
++            onPressed: () async {
++              final confirmed = await showDialog<bool>(
++                context: context,
++                builder: (_) => AlertDialog(
++                  title: const Text('¿Cancelar tu plan?'),
++                  content: const Text(
++                    'Seguirás con acceso hasta el final del periodo ya pagado. Después no se renovará.',
++                  ),
++                  actions: [
++                    TextButton(
++                      onPressed: () => Navigator.pop(context, false),
++                      child: const Text('Mantener mi plan'),
++                    ),
++                    TextButton(
++                      onPressed: () => Navigator.pop(context, true),
++                      child: const Text('Confirmar cancelación', style: TextStyle(color: Colors.red)),
++                    ),
++                  ],
++                ),
++              );
++              if (confirmed == true && context.mounted) {
++                // TODO: enviar la cancelación al backend.
++                ScaffoldMessenger.of(context).showSnackBar(
++                  const SnackBar(content: Text('Tu plan se cancelará al final del periodo')),
++                );
++              }
++            },
+             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+             child: const Text('Cancelar plan'),
+           ),
+diff --git a/lib/screens/player_screen.dart b/lib/screens/player_screen.dart
+index 989550a..bcf0ebf 100644
+--- a/lib/screens/player_screen.dart
++++ b/lib/screens/player_screen.dart
+@@ -11,6 +11,8 @@ class PlayerScreen extends StatefulWidget {
+ class _PlayerScreenState extends State<PlayerScreen> {
+   bool _autoplay = true;
+   bool _watchFromStart = true;
++  bool _inMyList = false;
++  bool? _liked;
+ 
+   @override
+   Widget build(BuildContext context) {
+@@ -57,12 +59,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
+           const SizedBox(height: 8),
+           Row(
+             children: [
+-              IconButton(icon: const Icon(Icons.thumb_up_outlined), onPressed: () {}), // req. 31 calificación
+-              IconButton(icon: const Icon(Icons.thumb_down_outlined), onPressed: () {}),
++              IconButton(
++                icon: Icon(_liked == true ? Icons.thumb_up : Icons.thumb_up_outlined),
++                onPressed: () => setState(() => _liked = _liked == true ? null : true),
++              ), // req. 31 calificación
++              IconButton(
++                icon: Icon(_liked == false ? Icons.thumb_down : Icons.thumb_down_outlined),
++                onPressed: () => setState(() => _liked = _liked == false ? null : false),
++              ),
+               const Spacer(),
+               OutlinedButton.icon(
+-                onPressed: () {}, // req. 34 mi lista
+-                icon: const Icon(Icons.favorite_border, size: 18),
++                onPressed: () {
++                  setState(() => _inMyList = !_inMyList);
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    SnackBar(content: Text(_inMyList ? 'Agregado a Mi lista' : 'Quitado de Mi lista')),
++                  );
++                }, // req. 34 mi lista
++                icon: Icon(_inMyList ? Icons.favorite : Icons.favorite_border, size: 18),
+                 label: const Text('Lista'),
+               ),
+             ],
+@@ -81,7 +94,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
+           Align(
+             alignment: Alignment.centerRight,
+             child: TextButton.icon(
+-              onPressed: () {}, // req. 48 compartir
++              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
++                const SnackBar(content: Text('Enlace copiado para compartir')),
++              ), // req. 48 compartir
+               icon: const Icon(Icons.share, size: 18),
+               label: const Text('Compartir'),
+             ),
+-- 
+2.43.0
+

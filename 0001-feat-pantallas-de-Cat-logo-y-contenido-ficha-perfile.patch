@@ -1,0 +1,561 @@
+From 2e3391b52c4728354c982c3c374f7b4d70c27082 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Tue, 13 Oct 2026 20:58:03 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20pantallas=20de=20Cat=C3=A1logo=20y=20co?=
+ =?UTF-8?q?ntenido=20(ficha,=20perfiles,=20control=20parental,=20notificac?=
+ =?UTF-8?q?iones,=20descargas)=20y=20las=20conecta=20a=20la=20navegaci?=
+ =?UTF-8?q?=C3=B3n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/catalog/downloads_screen.dart     | 75 ++++++++++++++
+ lib/screens/catalog/notifications_screen.dart | 52 ++++++++++
+ .../catalog/parental_control_screen.dart      | 82 +++++++++++++++
+ lib/screens/catalog/profiles_screen.dart      | 99 +++++++++++++++++++
+ lib/screens/content_detail_screen.dart        | 93 +++++++++++++++++
+ lib/screens/home_screen.dart                  | 22 ++++-
+ lib/screens/menu_screen.dart                  | 16 +++
+ lib/screens/search_screen.dart                |  4 +-
+ 8 files changed, 439 insertions(+), 4 deletions(-)
+ create mode 100644 lib/screens/catalog/downloads_screen.dart
+ create mode 100644 lib/screens/catalog/notifications_screen.dart
+ create mode 100644 lib/screens/catalog/parental_control_screen.dart
+ create mode 100644 lib/screens/catalog/profiles_screen.dart
+ create mode 100644 lib/screens/content_detail_screen.dart
+
+diff --git a/lib/screens/catalog/downloads_screen.dart b/lib/screens/catalog/downloads_screen.dart
+new file mode 100644
+index 0000000..d68171e
+--- /dev/null
++++ b/lib/screens/catalog/downloads_screen.dart
+@@ -0,0 +1,75 @@
++import 'package:flutter/material.dart';
++
++/// Req. 45, 46, 47: descargas para ver sin conexión y sus restricciones.
++class DownloadsScreen extends StatefulWidget {
++  const DownloadsScreen({super.key});
++
++  @override
++  State<DownloadsScreen> createState() => _DownloadsScreenState();
++}
++
++class _DownloadsScreenState extends State<DownloadsScreen> {
++  final List<Map<String, Object>> _downloads = [
++    {'titulo': 'Episodio 4', 'detalle': '124 MB · Descargado', 'progreso': 1.0},
++    {'titulo': 'Episodio 5', 'detalle': 'Descargando · 62%', 'progreso': 0.62},
++    {'titulo': 'Película X', 'detalle': 'En pausa · 30%', 'progreso': 0.30},
++  ];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Descargas')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          ..._downloads.asMap().entries.map(
++                (entry) => Card(
++                  child: Padding(
++                    padding: const EdgeInsets.all(12),
++                    child: Column(
++                      crossAxisAlignment: CrossAxisAlignment.start,
++                      children: [
++                        Row(
++                          children: [
++                            Expanded(
++                              child: Column(
++                                crossAxisAlignment: CrossAxisAlignment.start,
++                                children: [
++                                  Text(entry.value['titulo'] as String,
++                                      style: const TextStyle(fontWeight: FontWeight.bold)),
++                                  Text(entry.value['detalle'] as String,
++                                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
++                                ],
++                              ),
++                            ),
++                            IconButton(
++                              icon: const Icon(Icons.delete_outline),
++                              onPressed: () => setState(() => _downloads.removeAt(entry.key)),
++                            ),
++                          ],
++                        ),
++                        const SizedBox(height: 4),
++                        LinearProgressIndicator(value: entry.value['progreso'] as double),
++                      ],
++                    ),
++                  ),
++                ),
++              ),
++          const SizedBox(height: 8),
++          const Text(
++            'Límite de dispositivos y tiempo de disponibilidad según tu plan.',
++            textAlign: TextAlign.center,
++            style: TextStyle(fontSize: 12, color: Colors.grey),
++          ),
++          const SizedBox(height: 16),
++          OutlinedButton(
++            onPressed: () {
++              // TODO: navegar al catálogo para elegir qué descargar.
++            },
++            child: const Text('Descargar más contenido'),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/catalog/notifications_screen.dart b/lib/screens/catalog/notifications_screen.dart
+new file mode 100644
+index 0000000..2591f7f
+--- /dev/null
++++ b/lib/screens/catalog/notifications_screen.dart
+@@ -0,0 +1,52 @@
++import 'package:flutter/material.dart';
++
++/// Req. 43, 44: centro de notificaciones y preferencias.
++class NotificationsScreen extends StatefulWidget {
++  const NotificationsScreen({super.key});
++
++  @override
++  State<NotificationsScreen> createState() => _NotificationsScreenState();
++}
++
++class _NotificationsScreenState extends State<NotificationsScreen> {
++  final Map<String, bool> _preferences = {
++    'Estrenos': true,
++    'Cuenta y pagos': true,
++    'Novedades': true,
++  };
++
++  final List<Map<String, String>> _notifications = const [
++    {'titulo': 'Nuevo capítulo disponible', 'detalle': 'Serie · hace 2 h'},
++    {'titulo': 'Tu pago fue aprobado', 'detalle': 'Plan Estándar · hoy'},
++    {'titulo': 'Estreno esta semana', 'detalle': 'Película · hace 1 día'},
++  ];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Notificaciones')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          ..._notifications.map(
++            (n) => ListTile(
++              leading: const Icon(Icons.notifications_outlined),
++              title: Text(n['titulo']!),
++              subtitle: Text(n['detalle']!),
++            ),
++          ),
++          const Divider(height: 32),
++          const Text('Preferencias', style: TextStyle(fontWeight: FontWeight.bold)),
++          ..._preferences.keys.map(
++            (k) => SwitchListTile(
++              title: Text(k),
++              value: _preferences[k]!,
++              onChanged: (v) => setState(() => _preferences[k] = v),
++              contentPadding: EdgeInsets.zero,
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/catalog/parental_control_screen.dart b/lib/screens/catalog/parental_control_screen.dart
+new file mode 100644
+index 0000000..bdb9fb6
+--- /dev/null
++++ b/lib/screens/catalog/parental_control_screen.dart
+@@ -0,0 +1,82 @@
++import 'package:flutter/material.dart';
++
++/// Req. 41: control parental y clasificación máxima de contenido.
++class ParentalControlScreen extends StatefulWidget {
++  const ParentalControlScreen({super.key});
++
++  @override
++  State<ParentalControlScreen> createState() => _ParentalControlScreenState();
++}
++
++class _ParentalControlScreenState extends State<ParentalControlScreen> {
++  String _maxRating = '+14';
++  bool _restrictByProfile = true;
++  bool _blockPurchases = false;
++  final _pinController = TextEditingController();
++
++  @override
++  void dispose() {
++    _pinController.dispose();
++    super.dispose();
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Control parental')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          const Text('Clasificación máxima', style: TextStyle(fontWeight: FontWeight.bold)),
++          const SizedBox(height: 8),
++          Wrap(
++            spacing: 8,
++            children: ['TP', '+14', '+18'].map((r) {
++              return ChoiceChip(
++                label: Text(r),
++                selected: _maxRating == r,
++                onSelected: (_) => setState(() => _maxRating = r),
++              );
++            }).toList(),
++          ),
++          const Divider(height: 32),
++          const Text('PIN de control parental', style: TextStyle(fontWeight: FontWeight.bold)),
++          const SizedBox(height: 8),
++          TextField(
++            controller: _pinController,
++            obscureText: true,
++            keyboardType: TextInputType.number,
++            maxLength: 4,
++            decoration: const InputDecoration(hintText: '••••'),
++          ),
++          const Divider(),
++          SwitchListTile(
++            value: _restrictByProfile,
++            onChanged: (v) => setState(() => _restrictByProfile = v),
++            title: const Text('Restringir por perfil'),
++            contentPadding: EdgeInsets.zero,
++          ),
++          SwitchListTile(
++            value: _blockPurchases,
++            onChanged: (v) => setState(() => _blockPurchases = v),
++            title: const Text('Bloquear compras'),
++            contentPadding: EdgeInsets.zero,
++          ),
++          const SizedBox(height: 16),
++          SizedBox(
++            width: double.infinity,
++            child: ElevatedButton(
++              onPressed: () {
++                // TODO: guardar configuración en el backend.
++                ScaffoldMessenger.of(context).showSnackBar(
++                  const SnackBar(content: Text('Control parental actualizado')),
++                );
++              },
++              child: const Text('GUARDAR CAMBIOS'),
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/catalog/profiles_screen.dart b/lib/screens/catalog/profiles_screen.dart
+new file mode 100644
+index 0000000..110fb81
+--- /dev/null
++++ b/lib/screens/catalog/profiles_screen.dart
+@@ -0,0 +1,99 @@
++import 'package:flutter/material.dart';
++
++/// Req. 40: selección y gestión de perfiles.
++class ProfilesScreen extends StatefulWidget {
++  const ProfilesScreen({super.key});
++
++  @override
++  State<ProfilesScreen> createState() => _ProfilesScreenState();
++}
++
++class _ProfilesScreenState extends State<ProfilesScreen> {
++  final List<String> _profiles = ['Ana', 'Luis', 'Kids'];
++  int _selected = 0;
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('¿Quién ve ahora?')),
++      body: Padding(
++        padding: const EdgeInsets.all(16),
++        child: Column(
++          children: [
++            Wrap(
++              spacing: 16,
++              runSpacing: 16,
++              children: [
++                ..._profiles.asMap().entries.map(
++                      (e) => _ProfileAvatar(
++                        name: e.value,
++                        selected: _selected == e.key,
++                        onTap: () {
++                          setState(() => _selected = e.key);
++                          Navigator.pop(context, e.value);
++                        },
++                      ),
++                    ),
++                _ProfileAvatar(
++                  name: 'Agregar',
++                  isAdd: true,
++                  onTap: () {
++                    // TODO: abrir formulario para crear un nuevo perfil.
++                  },
++                ),
++              ],
++            ),
++            const SizedBox(height: 24),
++            OutlinedButton(
++              onPressed: () {
++                // TODO: pantalla de edición de perfiles (renombrar, borrar, marcar infantil).
++              },
++              child: const Text('Editar perfiles'),
++            ),
++            const Spacer(),
++            const Text(
++              'Cada perfil guarda su propio historial',
++              style: TextStyle(fontSize: 12, color: Colors.grey),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
++
++class _ProfileAvatar extends StatelessWidget {
++  final String name;
++  final bool selected;
++  final bool isAdd;
++  final VoidCallback onTap;
++
++  const _ProfileAvatar({
++    required this.name,
++    required this.onTap,
++    this.selected = false,
++    this.isAdd = false,
++  });
++
++  @override
++  Widget build(BuildContext context) {
++    return GestureDetector(
++      onTap: onTap,
++      child: Column(
++        children: [
++          CircleAvatar(
++            radius: 32,
++            backgroundColor: isAdd ? const Color(0xFFEEF0F4) : const Color(0xFFC8CBD0),
++            child: Icon(
++              isAdd ? Icons.add : Icons.person,
++              size: 32,
++              color: isAdd ? Colors.grey.shade600 : Colors.white,
++            ),
++          ),
++          const SizedBox(height: 6),
++          Text(name, style: TextStyle(fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/content_detail_screen.dart b/lib/screens/content_detail_screen.dart
+new file mode 100644
+index 0000000..3d3483d
+--- /dev/null
++++ b/lib/screens/content_detail_screen.dart
+@@ -0,0 +1,93 @@
++import 'package:flutter/material.dart';
++import 'player_screen.dart';
++
++/// Req. 19: ficha de un contenido (serie/película) antes de reproducir.
++class ContentDetailScreen extends StatefulWidget {
++  final String title;
++  const ContentDetailScreen({super.key, this.title = 'Título de la serie'});
++
++  @override
++  State<ContentDetailScreen> createState() => _ContentDetailScreenState();
++}
++
++class _ContentDetailScreenState extends State<ContentDetailScreen> {
++  bool _inMyList = false;
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      body: CustomScrollView(
++        slivers: [
++          SliverAppBar(
++            expandedHeight: 220,
++            pinned: true,
++            flexibleSpace: FlexibleSpaceBar(
++              background: Container(
++                color: const Color(0xFFEEF0F4),
++                child: const Center(child: Icon(Icons.play_circle_outline, size: 56)),
++              ),
++            ),
++          ),
++          SliverPadding(
++            padding: const EdgeInsets.all(16),
++            sliver: SliverList(
++              delegate: SliverChildListDelegate([
++                Text(widget.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
++                const SizedBox(height: 4),
++                const Text('2026 · 3 temporadas · +14', style: TextStyle(color: Colors.grey)),
++                const SizedBox(height: 8),
++                Wrap(
++                  spacing: 8,
++                  children: const [
++                    Chip(label: Text('Drama')),
++                    Chip(label: Text('Suspenso')),
++                    Chip(label: Text('Acción')),
++                  ],
++                ),
++                const SizedBox(height: 16),
++                const Text(
++                  'Sinopsis: descripción del contenido, lista para reemplazar con los datos reales '
++                  'del catálogo (reparto, director, temporadas, episodios).',
++                ),
++                const SizedBox(height: 24),
++                SizedBox(
++                  width: double.infinity,
++                  child: ElevatedButton.icon(
++                    icon: const Icon(Icons.play_arrow),
++                    label: const Text('REPRODUCIR'),
++                    onPressed: () => Navigator.push(
++                      context,
++                      MaterialPageRoute(builder: (_) => const PlayerScreen()),
++                    ),
++                  ),
++                ),
++                const SizedBox(height: 12),
++                Row(
++                  children: [
++                    Expanded(
++                      child: OutlinedButton.icon(
++                        icon: Icon(_inMyList ? Icons.favorite : Icons.favorite_border),
++                        label: Text(_inMyList ? 'En mi lista' : '+ Mi lista'),
++                        onPressed: () => setState(() => _inMyList = !_inMyList),
++                      ),
++                    ),
++                    const SizedBox(width: 8),
++                    Expanded(
++                      child: OutlinedButton.icon(
++                        icon: const Icon(Icons.share),
++                        label: const Text('Compartir'),
++                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
++                          const SnackBar(content: Text('Enlace copiado para compartir')),
++                        ),
++                      ),
++                    ),
++                  ],
++                ),
++              ]),
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart
+index 0cdf74d..49725a3 100644
+--- a/lib/screens/home_screen.dart
++++ b/lib/screens/home_screen.dart
+@@ -1,8 +1,10 @@
+ import 'package:flutter/material.dart';
+ import 'search_screen.dart';
+ import 'menu_screen.dart';
+-import 'player_screen.dart';
++import 'content_detail_screen.dart';
+ import 'payments/subscription_screen.dart';
++import 'catalog/notifications_screen.dart';
++import 'catalog/downloads_screen.dart';
+ 
+ /// Req. 17, 28, 39: pantalla de inicio con sugerencias, seguir viendo y recomendaciones.
+ class HomeScreen extends StatelessWidget {
+@@ -23,7 +25,7 @@ class HomeScreen extends StatelessWidget {
+             itemBuilder: (_, __) => GestureDetector(
+               onTap: () => Navigator.push(
+                 context,
+-                MaterialPageRoute(builder: (_) => const PlayerScreen()),
++                MaterialPageRoute(builder: (_) => const ContentDetailScreen()),
+               ),
+               child: Container(
+                 width: 90,
+@@ -50,6 +52,22 @@ class HomeScreen extends StatelessWidget {
+           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuScreen())),
+         ),
+         actions: [
++          IconButton(
++            icon: const Icon(Icons.notifications_outlined),
++            tooltip: 'Notificaciones',
++            onPressed: () => Navigator.push(
++              context,
++              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
++            ),
++          ),
++          IconButton(
++            icon: const Icon(Icons.download_outlined),
++            tooltip: 'Descargas',
++            onPressed: () => Navigator.push(
++              context,
++              MaterialPageRoute(builder: (_) => const DownloadsScreen()),
++            ),
++          ),
+           IconButton(
+             icon: const Icon(Icons.account_circle_outlined),
+             tooltip: 'Mi suscripción',
+diff --git a/lib/screens/menu_screen.dart b/lib/screens/menu_screen.dart
+index 519569a..992fd97 100644
+--- a/lib/screens/menu_screen.dart
++++ b/lib/screens/menu_screen.dart
+@@ -1,4 +1,6 @@
+ import 'package:flutter/material.dart';
++import 'catalog/profiles_screen.dart';
++import 'catalog/parental_control_screen.dart';
+ 
+ /// Req. 18, 38: categorías y tipos de contenido.
+ class MenuScreen extends StatelessWidget {
+@@ -35,6 +37,20 @@ class MenuScreen extends StatelessWidget {
+               Chip(label: Text('Documentales')),
+             ],
+           ),
++          const Divider(height: 32),
++          ListTile(
++            leading: const Icon(Icons.people_outline),
++            title: const Text('Perfiles'),
++            trailing: const Icon(Icons.chevron_right),
++            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilesScreen())),
++          ),
++          ListTile(
++            leading: const Icon(Icons.shield_outlined),
++            title: const Text('Control parental'),
++            trailing: const Icon(Icons.chevron_right),
++            onTap: () =>
++                Navigator.push(context, MaterialPageRoute(builder: (_) => const ParentalControlScreen())),
++          ),
+         ],
+       ),
+     );
+diff --git a/lib/screens/search_screen.dart b/lib/screens/search_screen.dart
+index 8c786fd..19de303 100644
+--- a/lib/screens/search_screen.dart
++++ b/lib/screens/search_screen.dart
+@@ -1,5 +1,5 @@
+ import 'package:flutter/material.dart';
+-import 'player_screen.dart';
++import 'content_detail_screen.dart';
+ 
+ /// Req. 36, 37: búsqueda y filtros.
+ class SearchScreen extends StatelessWidget {
+@@ -56,7 +56,7 @@ class SearchScreen extends StatelessWidget {
+                 itemBuilder: (_, __) => GestureDetector(
+                   onTap: () => Navigator.push(
+                     context,
+-                    MaterialPageRoute(builder: (_) => const PlayerScreen()),
++                    MaterialPageRoute(builder: (_) => const ContentDetailScreen()),
+                   ),
+                   child: Container(
+                     decoration: BoxDecoration(
+-- 
+2.43.0
+

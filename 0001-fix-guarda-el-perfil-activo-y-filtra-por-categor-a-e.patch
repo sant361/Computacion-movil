@@ -1,0 +1,630 @@
+From d70d5d686c44b594d204ffb63d5546d65924b6eb Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Wed, 21 Oct 2026 17:39:42 -0500
+Subject: [PATCH] =?UTF-8?q?fix:=20guarda=20el=20perfil=20activo=20y=20filt?=
+ =?UTF-8?q?ra=20por=20categor=C3=ADa=20en=20Inicio=20sin=20salir=20de=20la?=
+ =?UTF-8?q?=20pantalla?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Antes, elegir un perfil en "¿Quién ve ahora?" no quedaba guardado en
+  ningún lado: la pantalla se cerraba pero nada recordaba la elección,
+  así que siempre parecía reiniciarse a "Ana". Ahora AppState guarda
+  la lista de perfiles y cuál está activo, por cuenta (igual que los
+  métodos de pago). También se puede agregar y eliminar perfiles de
+  verdad desde "Editar perfiles".
+- El chip "Todo" en Inicio quedaba siempre resaltado sin importar cuál
+  tocaras (bug de "selected: isAll" en vez de comparar con la
+  selección real). Se corrige, y ahora tocar una categoría filtra el
+  contenido ahí mismo en Inicio en vez de llevar a otra pantalla.
+---
+ lib/main.dart                            |   2 +
+ lib/screens/auth/login_screen.dart       |   1 +
+ lib/screens/catalog/profiles_screen.dart | 178 +++++++++++++++++------
+ lib/screens/home_screen.dart             | 170 ++++++++++++++++------
+ lib/screens/menu_screen.dart             |  17 ++-
+ lib/state/app_state.dart                 |  64 ++++++++
+ 6 files changed, 340 insertions(+), 92 deletions(-)
+
+diff --git a/lib/main.dart b/lib/main.dart
+index 83bcd03..d720aaa 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,3 +1,4 @@
++import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:firebase_core/firebase_core.dart';
+ import 'package:flutter/foundation.dart' show kIsWeb;
+ import 'package:flutter/material.dart';
+@@ -44,6 +45,7 @@ class _AppStartup extends StatelessWidget {
+     await appState.load();
+     if (appState.isLoggedIn) {
+       await appState.loadCatalogFromFirestore();
++      await appState.loadProfiles(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+     }
+   }
+ 
+diff --git a/lib/screens/auth/login_screen.dart b/lib/screens/auth/login_screen.dart
+index 234699b..88dd457 100644
+--- a/lib/screens/auth/login_screen.dart
++++ b/lib/screens/auth/login_screen.dart
+@@ -92,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
+       );
+       await appState.login();
+       await appState.loadCatalogFromFirestore();
++      await appState.loadProfiles(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+       if (!mounted) return;
+       Navigator.pushReplacement(
+         context,
+diff --git a/lib/screens/catalog/profiles_screen.dart b/lib/screens/catalog/profiles_screen.dart
+index 110fb81..c1c8244 100644
+--- a/lib/screens/catalog/profiles_screen.dart
++++ b/lib/screens/catalog/profiles_screen.dart
+@@ -1,6 +1,8 @@
++import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
++import '../../state/app_state.dart';
+ 
+-/// Req. 40: selección y gestión de perfiles.
++/// Req. 40: selección y gestión de perfiles, guardados por cuenta.
+ class ProfilesScreen extends StatefulWidget {
+   const ProfilesScreen({super.key});
+ 
+@@ -9,54 +11,121 @@ class ProfilesScreen extends StatefulWidget {
+ }
+ 
+ class _ProfilesScreenState extends State<ProfilesScreen> {
+-  final List<String> _profiles = ['Ana', 'Luis', 'Kids'];
+-  int _selected = 0;
++  bool _editMode = false;
++  bool _loading = true;
++
++  @override
++  void initState() {
++    super.initState();
++    _load();
++  }
++
++  Future<void> _load() async {
++    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'local';
++    await appState.loadProfiles(uid);
++    if (mounted) setState(() => _loading = false);
++  }
++
++  Future<void> _selectProfile(String name) async {
++    await appState.setActiveProfile(name);
++    if (!mounted) return;
++    Navigator.pop(context, name);
++  }
++
++  Future<void> _addProfile() async {
++    final controller = TextEditingController();
++    final name = await showDialog<String>(
++      context: context,
++      builder: (_) => AlertDialog(
++        title: const Text('Nuevo perfil'),
++        content: TextField(
++          controller: controller,
++          autofocus: true,
++          decoration: const InputDecoration(labelText: 'Nombre'),
++        ),
++        actions: [
++          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
++          TextButton(
++            onPressed: () => Navigator.pop(context, controller.text),
++            child: const Text('Agregar'),
++          ),
++        ],
++      ),
++    );
++    if (name != null && name.trim().isNotEmpty) {
++      await appState.addProfile(name);
++    }
++  }
++
++  Future<void> _removeProfile(String name) async {
++    final confirmed = await showDialog<bool>(
++      context: context,
++      builder: (_) => AlertDialog(
++        title: const Text('¿Eliminar este perfil?'),
++        content: Text('Se eliminará "$name" de esta cuenta.'),
++        actions: [
++          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
++          TextButton(
++            onPressed: () => Navigator.pop(context, true),
++            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
++          ),
++        ],
++      ),
++    );
++    if (confirmed == true) {
++      await appState.removeProfile(name);
++    }
++  }
+ 
+   @override
+   Widget build(BuildContext context) {
++    if (_loading) {
++      return const Scaffold(body: Center(child: CircularProgressIndicator()));
++    }
+     return Scaffold(
+       appBar: AppBar(title: const Text('¿Quién ve ahora?')),
+-      body: Padding(
+-        padding: const EdgeInsets.all(16),
+-        child: Column(
+-          children: [
+-            Wrap(
+-              spacing: 16,
+-              runSpacing: 16,
++      body: ListenableBuilder(
++        listenable: appState,
++        builder: (context, _) {
++          final profiles = appState.profiles;
++          final active = appState.activeProfile;
++          return Padding(
++            padding: const EdgeInsets.all(16),
++            child: Column(
+               children: [
+-                ..._profiles.asMap().entries.map(
+-                      (e) => _ProfileAvatar(
+-                        name: e.value,
+-                        selected: _selected == e.key,
+-                        onTap: () {
+-                          setState(() => _selected = e.key);
+-                          Navigator.pop(context, e.value);
+-                        },
++                Wrap(
++                  spacing: 16,
++                  runSpacing: 16,
++                  children: [
++                    ...profiles.map(
++                      (name) => _ProfileAvatar(
++                        name: name,
++                        selected: active == name,
++                        showDelete: _editMode,
++                        onTap: () => _editMode ? _removeProfile(name) : _selectProfile(name),
+                       ),
+                     ),
+-                _ProfileAvatar(
+-                  name: 'Agregar',
+-                  isAdd: true,
+-                  onTap: () {
+-                    // TODO: abrir formulario para crear un nuevo perfil.
+-                  },
++                    _ProfileAvatar(
++                      name: 'Agregar',
++                      isAdd: true,
++                      onTap: _addProfile,
++                    ),
++                  ],
++                ),
++                const SizedBox(height: 24),
++                OutlinedButton(
++                  onPressed: () => setState(() => _editMode = !_editMode),
++                  child: Text(_editMode ? 'Listo' : 'Editar perfiles'),
++                ),
++                const Spacer(),
++                const Text(
++                  'Cada perfil guarda su propio historial',
++                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                 ),
+               ],
+             ),
+-            const SizedBox(height: 24),
+-            OutlinedButton(
+-              onPressed: () {
+-                // TODO: pantalla de edición de perfiles (renombrar, borrar, marcar infantil).
+-              },
+-              child: const Text('Editar perfiles'),
+-            ),
+-            const Spacer(),
+-            const Text(
+-              'Cada perfil guarda su propio historial',
+-              style: TextStyle(fontSize: 12, color: Colors.grey),
+-            ),
+-          ],
+-        ),
++          );
++        },
+       ),
+     );
+   }
+@@ -66,6 +135,7 @@ class _ProfileAvatar extends StatelessWidget {
+   final String name;
+   final bool selected;
+   final bool isAdd;
++  final bool showDelete;
+   final VoidCallback onTap;
+ 
+   const _ProfileAvatar({
+@@ -73,6 +143,7 @@ class _ProfileAvatar extends StatelessWidget {
+     required this.onTap,
+     this.selected = false,
+     this.isAdd = false,
++    this.showDelete = false,
+   });
+ 
+   @override
+@@ -81,14 +152,29 @@ class _ProfileAvatar extends StatelessWidget {
+       onTap: onTap,
+       child: Column(
+         children: [
+-          CircleAvatar(
+-            radius: 32,
+-            backgroundColor: isAdd ? const Color(0xFFEEF0F4) : const Color(0xFFC8CBD0),
+-            child: Icon(
+-              isAdd ? Icons.add : Icons.person,
+-              size: 32,
+-              color: isAdd ? Colors.grey.shade600 : Colors.white,
+-            ),
++          Stack(
++            clipBehavior: Clip.none,
++            children: [
++              CircleAvatar(
++                radius: 32,
++                backgroundColor: isAdd ? const Color(0xFFEEF0F4) : const Color(0xFFC8CBD0),
++                child: Icon(
++                  isAdd ? Icons.add : (showDelete ? Icons.delete_outline : Icons.person),
++                  size: 32,
++                  color: isAdd ? Colors.grey.shade600 : Colors.white,
++                ),
++              ),
++              if (selected && !isAdd)
++                const Positioned(
++                  right: -2,
++                  bottom: -2,
++                  child: CircleAvatar(
++                    radius: 10,
++                    backgroundColor: Colors.green,
++                    child: Icon(Icons.check, size: 14, color: Colors.white),
++                  ),
++                ),
++            ],
+           ),
+           const SizedBox(height: 6),
+           Text(name, style: TextStyle(fontWeight: selected ? FontWeight.bold : FontWeight.normal)),
+diff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart
+index d2cbabf..072006a 100644
+--- a/lib/screens/home_screen.dart
++++ b/lib/screens/home_screen.dart
+@@ -9,9 +9,16 @@ import 'payments/subscription_screen.dart';
+ import 'search_screen.dart';
+ import 'tokens/tokens_screen.dart';
+ 
+-class HomeScreen extends StatelessWidget {
++class HomeScreen extends StatefulWidget {
+   const HomeScreen({super.key});
+ 
++  @override
++  State<HomeScreen> createState() => _HomeScreenState();
++}
++
++class _HomeScreenState extends State<HomeScreen> {
++  String _selectedCategory = 'Todo';
++
+   void _openItem(BuildContext context, CatalogItem item) {
+     Navigator.push(
+       context,
+@@ -124,43 +131,43 @@ class HomeScreen extends StatelessWidget {
+       body: ListView(
+         padding: const EdgeInsets.only(top: 8, bottom: 24),
+         children: [
+-          _CategoryStrip(onSelected: (genre) {
+-            Navigator.push(
+-              context,
+-              MaterialPageRoute(
+-                builder: (_) => SearchScreen(
+-                  initialGenre: genre == 'Todo' ? null : genre,
+-                ),
+-              ),
+-            );
+-          }),
+-          const SizedBox(height: 16),
+-          if (featuredItem != null) ...[
+-            _FeaturedCard(item: featuredItem, onTap: () {
+-              _openItem(context, featuredItem);
+-            }),
+-            const SizedBox(height: 28),
+-          ],
+-          _PosterSection(
+-            title: 'Series que podrían gustarte',
+-            action: 'Ver todo',
+-            items: featured,
+-            onItemTap: (item) => _openItem(context, item),
+-            onActionTap: () => _openSearch(context),
+-          ),
+-          const SizedBox(height: 12),
+-          _ContinueWatchingSection(
+-            items: continueWatching,
+-            onItemTap: (item) => _openItem(context, item),
+-          ),
+-          const SizedBox(height: 12),
+-          _PosterSection(
+-            title: 'Elegidas para ti',
+-            action: 'Explorar',
+-            items: recommended,
+-            onItemTap: (item) => _openItem(context, item),
+-            onActionTap: () => _openSearch(context),
++          _CategoryStrip(
++            selected: _selectedCategory,
++            onSelected: (genre) => setState(() => _selectedCategory = genre),
+           ),
++          const SizedBox(height: 16),
++          if (_selectedCategory == 'Todo') ...[
++            if (featuredItem != null) ...[
++              _FeaturedCard(item: featuredItem, onTap: () {
++                _openItem(context, featuredItem);
++              }),
++              const SizedBox(height: 28),
++            ],
++            _PosterSection(
++              title: 'Series que podrían gustarte',
++              action: 'Ver todo',
++              items: featured,
++              onItemTap: (item) => _openItem(context, item),
++              onActionTap: () => _openSearch(context),
++            ),
++            const SizedBox(height: 12),
++            _ContinueWatchingSection(
++              items: continueWatching,
++              onItemTap: (item) => _openItem(context, item),
++            ),
++            const SizedBox(height: 12),
++            _PosterSection(
++              title: 'Elegidas para ti',
++              action: 'Explorar',
++              items: recommended,
++              onItemTap: (item) => _openItem(context, item),
++              onActionTap: () => _openSearch(context),
++            ),
++          ] else
++            _CategoryGrid(
++              items: catalog.where((item) => item.genre == _selectedCategory).toList(),
++              onItemTap: (item) => _openItem(context, item),
++            ),
+         ],
+       ),
+       bottomNavigationBar: NavigationBar(
+@@ -207,8 +214,9 @@ class HomeScreen extends StatelessWidget {
+ }
+ 
+ class _CategoryStrip extends StatelessWidget {
+-  const _CategoryStrip({required this.onSelected});
++  const _CategoryStrip({required this.selected, required this.onSelected});
+ 
++  final String selected;
+   final ValueChanged<String> onSelected;
+   static const _categories = [
+     'Todo',
+@@ -230,14 +238,14 @@ class _CategoryStrip extends StatelessWidget {
+         separatorBuilder: (_, __) => const SizedBox(width: 9),
+         itemBuilder: (_, index) {
+           final category = _categories[index];
+-          final isAll = index == 0;
++          final isSelected = category == selected;
+           return ChoiceChip(
+             label: Text(category),
+-            selected: isAll,
++            selected: isSelected,
+             showCheckmark: false,
+             onSelected: (_) => onSelected(category),
+             labelStyle: TextStyle(
+-              color: isAll ? const Color(0xFF07111F) : Colors.white70,
++              color: isSelected ? const Color(0xFF07111F) : Colors.white70,
+               fontWeight: FontWeight.w600,
+             ),
+             selectedColor: const Color(0xFF35D0C4),
+@@ -653,6 +661,86 @@ class _ContinueWatchingSection extends StatelessWidget {
+   }
+ }
+ 
++/// Resultados al tocar una categoría arriba de Inicio (Acción, Comedia...):
++/// filtra ahí mismo en vez de llevar a otra pantalla.
++class _CategoryGrid extends StatelessWidget {
++  const _CategoryGrid({required this.items, required this.onItemTap});
++
++  final List<CatalogItem> items;
++  final ValueChanged<CatalogItem> onItemTap;
++
++  @override
++  Widget build(BuildContext context) {
++    if (items.isEmpty) {
++      return const Padding(
++        padding: EdgeInsets.symmetric(vertical: 48),
++        child: Center(
++          child: Text(
++            'No hay contenido en esta categoría todavía',
++            style: TextStyle(color: Colors.white54),
++          ),
++        ),
++      );
++    }
++    return Padding(
++      padding: const EdgeInsets.symmetric(horizontal: 20),
++      child: GridView.builder(
++        shrinkWrap: true,
++        physics: const NeverScrollableScrollPhysics(),
++        itemCount: items.length,
++        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
++          crossAxisCount: 2,
++          crossAxisSpacing: 12,
++          mainAxisSpacing: 12,
++          childAspectRatio: 0.78,
++        ),
++        itemBuilder: (_, index) {
++          final item = items[index];
++          final colors = _genreColors(item.genre);
++          return InkWell(
++            borderRadius: BorderRadius.circular(14),
++            onTap: () => onItemTap(item),
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.start,
++              children: [
++                Expanded(
++                  child: ClipRRect(
++                    borderRadius: BorderRadius.circular(14),
++                    child: DecoratedBox(
++                      decoration: BoxDecoration(
++                        gradient: LinearGradient(
++                          begin: Alignment.topLeft,
++                          end: Alignment.bottomRight,
++                          colors: colors,
++                        ),
++                      ),
++                      child: const Center(
++                        child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 36),
++                      ),
++                    ),
++                  ),
++                ),
++                const SizedBox(height: 8),
++                Text(
++                  item.title,
++                  maxLines: 1,
++                  overflow: TextOverflow.ellipsis,
++                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
++                ),
++                const SizedBox(height: 3),
++                Text(
++                  '${item.genre}  ·  ${item.year}',
++                  style: const TextStyle(color: Colors.white54, fontSize: 11),
++                ),
++              ],
++            ),
++          );
++        },
++      ),
++    );
++  }
++}
++
+ List<Color> _genreColors(String genre) {
+   return switch (genre) {
+     'Comedia' => const [Color(0xFF8B4A80), Color(0xFF382653)],
+diff --git a/lib/screens/menu_screen.dart b/lib/screens/menu_screen.dart
+index c6d6342..309a35a 100644
+--- a/lib/screens/menu_screen.dart
++++ b/lib/screens/menu_screen.dart
+@@ -3,6 +3,7 @@ import 'catalog/profiles_screen.dart';
+ import 'catalog/parental_control_screen.dart';
+ import 'admin/admin_dashboard_screen.dart';
+ import 'search_screen.dart';
++import '../state/app_state.dart';
+ 
+ /// Req. 18, 38: categorías y tipos de contenido.
+ class MenuScreen extends StatelessWidget {
+@@ -41,11 +42,17 @@ class MenuScreen extends StatelessWidget {
+             ],
+           ),
+           const Divider(height: 32),
+-          ListTile(
+-            leading: const Icon(Icons.people_outline),
+-            title: const Text('Perfiles'),
+-            trailing: const Icon(Icons.chevron_right),
+-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilesScreen())),
++          ListenableBuilder(
++            listenable: appState,
++            builder: (context, _) => ListTile(
++              leading: const Icon(Icons.people_outline),
++              title: const Text('Perfiles'),
++              subtitle: appState.activeProfile == null
++                  ? null
++                  : Text('Viendo como ${appState.activeProfile}'),
++              trailing: const Icon(Icons.chevron_right),
++              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilesScreen())),
++            ),
+           ),
+           ListTile(
+             leading: const Icon(Icons.shield_outlined),
+diff --git a/lib/state/app_state.dart b/lib/state/app_state.dart
+index 0ffbf61..abb381a 100644
+--- a/lib/state/app_state.dart
++++ b/lib/state/app_state.dart
+@@ -36,6 +36,12 @@ class AppState extends ChangeNotifier {
+   List<CatalogItem> _catalog = sampleCatalog;
+   List<CatalogItem> get catalog => List.unmodifiable(_catalog);
+ 
++  String? _profileUserId;
++  List<String> _profiles = [];
++  List<String> get profiles => List.unmodifiable(_profiles);
++  String? _activeProfile;
++  String? get activeProfile => _activeProfile;
++
+   bool _isLoggedIn = false;
+   bool get isLoggedIn => _isLoggedIn;
+ 
+@@ -113,6 +119,9 @@ class AppState extends ChangeNotifier {
+     _isLoggedIn = false;
+     _paymentUserId = null;
+     _paymentMethods = [];
++    _profileUserId = null;
++    _profiles = [];
++    _activeProfile = null;
+     notifyListeners();
+     final prefs = _prefs ??= await SharedPreferences.getInstance();
+     await prefs.setBool(_isLoggedInKey, false);
+@@ -271,6 +280,61 @@ class AppState extends ChangeNotifier {
+       // local que ya estaba mostrando la app.
+     }
+   }
++
++  String _profilesKey(String userId) => 'profiles:$userId';
++  String _activeProfileKey(String userId) => 'activeProfile:$userId';
++
++  /// Carga los perfiles guardados para [userId] (y cuál queda activo).
++  /// Si es la primera vez, crea los 3 perfiles de muestra de siempre
++  /// para que la pantalla no empiece vacía.
++  Future<void> loadProfiles(String userId) async {
++    _profileUserId = userId;
++    final prefs = _prefs ??= await SharedPreferences.getInstance();
++    _profiles = prefs.getStringList(_profilesKey(userId)) ?? ['Ana', 'Luis', 'Kids'];
++    _activeProfile = prefs.getString(_activeProfileKey(userId)) ??
++        (_profiles.isNotEmpty ? _profiles.first : null);
++    notifyListeners();
++    await _persistProfiles();
++  }
++
++  Future<void> _persistProfiles() async {
++    final userId = _profileUserId;
++    if (userId == null) return;
++    final prefs = _prefs ??= await SharedPreferences.getInstance();
++    await prefs.setStringList(_profilesKey(userId), _profiles);
++    final active = _activeProfile;
++    if (active != null) {
++      await prefs.setString(_activeProfileKey(userId), active);
++    }
++  }
++
++  /// Marca [name] como el perfil que se está usando ahora mismo.
++  Future<void> setActiveProfile(String name) async {
++    if (!_profiles.contains(name)) return;
++    _activeProfile = name;
++    notifyListeners();
++    await _persistProfiles();
++  }
++
++  /// Crea un perfil nuevo con [name] (se ignora si está vacío o repetido).
++  Future<void> addProfile(String name) async {
++    final trimmed = name.trim();
++    if (trimmed.isEmpty || _profiles.contains(trimmed)) return;
++    _profiles.add(trimmed);
++    notifyListeners();
++    await _persistProfiles();
++  }
++
++  /// Elimina el perfil [name]. Si era el activo, el primero que quede
++  /// pasa a ser el nuevo activo.
++  Future<void> removeProfile(String name) async {
++    _profiles.remove(name);
++    if (_activeProfile == name) {
++      _activeProfile = _profiles.isNotEmpty ? _profiles.first : null;
++    }
++    notifyListeners();
++    await _persistProfiles();
++  }
+ }
+ 
+ /// Instancia única compartida por toda la app.
+-- 
+2.43.0
+

@@ -1,0 +1,151 @@
+From 868d868b7f35ad304227c4ade0507be9f4a7f9bf Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Thu, 15 Oct 2026 19:26:03 +0000
+Subject: [PATCH 1/4] =?UTF-8?q?feat:=20recuerda=20la=20sesi=C3=B3n=20inici?=
+ =?UTF-8?q?ada=20(persistida)=20y=20agrega=20Cerrar=20sesi=C3=B3n=20real?=
+ =?UTF-8?q?=20en=20Mi=20suscripci=C3=B3n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/main.dart                                 |  5 ++---
+ lib/screens/auth/login_screen.dart            |  7 ++++--
+ lib/screens/payments/subscription_screen.dart | 16 ++++++++++++++
+ lib/state/app_state.dart                      | 22 +++++++++++++++++++
+ 4 files changed, 45 insertions(+), 5 deletions(-)
+
+diff --git a/lib/main.dart b/lib/main.dart
+index 212d89f..d154fbb 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,5 +1,6 @@
+ import 'package:flutter/material.dart';
+ import 'screens/auth/login_screen.dart';
++import 'screens/home_screen.dart';
+ import 'state/app_state.dart';
+ 
+ void main() {
+@@ -38,9 +39,7 @@ class _AppStartup extends StatelessWidget {
+         if (snapshot.connectionState != ConnectionState.done) {
+           return const Scaffold(body: Center(child: CircularProgressIndicator()));
+         }
+-        // TODO: una vez tengas el login real, revisa aquí si ya hay una sesión
+-        // guardada y navega directo a HomeScreen en vez de pedir Login otra vez.
+-        return const LoginScreen();
++        return appState.isLoggedIn ? const HomeScreen() : const LoginScreen();
+       },
+     );
+   }
+diff --git a/lib/screens/auth/login_screen.dart b/lib/screens/auth/login_screen.dart
+index 5afce0d..8a07728 100644
+--- a/lib/screens/auth/login_screen.dart
++++ b/lib/screens/auth/login_screen.dart
+@@ -1,5 +1,6 @@
+ import 'package:flutter/material.dart';
+ import '../../widgets/primary_button.dart';
++import '../../state/app_state.dart';
+ import '../home_screen.dart';
+ import 'register_screen.dart';
+ import 'forgot_password_screen.dart';
+@@ -31,9 +32,11 @@ class _LoginScreenState extends State<LoginScreen> {
+     _passwordController.text = 'Demo1234';
+   }
+ 
+-  void _submit() {
++  Future<void> _submit() async {
+     if (_formKey.currentState!.validate()) {
+-      // TODO: validar credenciales contra el backend real.
++      // TODO: validar credenciales contra el backend real antes de llamar a login().
++      await appState.login();
++      if (!mounted) return;
+       Navigator.pushReplacement(
+         context,
+         MaterialPageRoute(builder: (_) => const HomeScreen()),
+diff --git a/lib/screens/payments/subscription_screen.dart b/lib/screens/payments/subscription_screen.dart
+index 1dbb9ad..596d6e8 100644
+--- a/lib/screens/payments/subscription_screen.dart
++++ b/lib/screens/payments/subscription_screen.dart
+@@ -4,6 +4,8 @@ import 'payment_methods_screen.dart';
+ import 'plans_screen.dart';
+ import '../account/security_screen.dart';
+ import '../account/devices_screen.dart';
++import '../../state/app_state.dart';
++import '../auth/login_screen.dart';
+ 
+ /// Req. 14, 15, 16: estado de la suscripción, cambio y cancelación de plan.
+ class SubscriptionScreen extends StatefulWidget {
+@@ -96,6 +98,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
+             trailing: const Icon(Icons.chevron_right),
+             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DevicesScreen())),
+           ),
++          const Divider(),
++          ListTile(
++            leading: const Icon(Icons.logout, color: Colors.red),
++            title: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
++            onTap: () async {
++              await appState.logout();
++              if (!context.mounted) return;
++              Navigator.pushAndRemoveUntil(
++                context,
++                MaterialPageRoute(builder: (_) => const LoginScreen()),
++                (route) => false,
++              );
++            },
++          ),
+         ],
+       ),
+     );
+diff --git a/lib/state/app_state.dart b/lib/state/app_state.dart
+index 58a953b..e41d05a 100644
+--- a/lib/state/app_state.dart
++++ b/lib/state/app_state.dart
+@@ -14,9 +14,13 @@ import 'package:shared_preferences/shared_preferences.dart';
+ class AppState extends ChangeNotifier {
+   static const _tokenBalanceKey = 'tokenBalance';
+   static const _myListKey = 'myList';
++  static const _isLoggedInKey = 'isLoggedIn';
+ 
+   SharedPreferences? _prefs;
+ 
++  bool _isLoggedIn = false;
++  bool get isLoggedIn => _isLoggedIn;
++
+   int _tokenBalance = 1250;
+   int get tokenBalance => _tokenBalance;
+ 
+@@ -35,6 +39,7 @@ class AppState extends ChangeNotifier {
+   Future<void> load() async {
+     _prefs = await SharedPreferences.getInstance();
+     _tokenBalance = _prefs!.getInt(_tokenBalanceKey) ?? _tokenBalance;
++    _isLoggedIn = _prefs!.getBool(_isLoggedInKey) ?? false;
+     final savedList = _prefs!.getStringList(_myListKey);
+     if (savedList != null) {
+       _myList
+@@ -50,6 +55,23 @@ class AppState extends ChangeNotifier {
+     await prefs.setStringList(_myListKey, _myList.toList());
+   }
+ 
++  /// Marca la sesión como iniciada y lo recuerda en el dispositivo.
++  /// TODO: cuando haya backend real, aquí se validarían las credenciales
++  /// y se guardaría el token de sesión en vez de solo un booleano.
++  Future<void> login() async {
++    _isLoggedIn = true;
++    notifyListeners();
++    final prefs = _prefs ??= await SharedPreferences.getInstance();
++    await prefs.setBool(_isLoggedInKey, true);
++  }
++
++  Future<void> logout() async {
++    _isLoggedIn = false;
++    notifyListeners();
++    final prefs = _prefs ??= await SharedPreferences.getInstance();
++    await prefs.setBool(_isLoggedInKey, false);
++  }
++
+   void addTokens(int amount, {required String reason}) {
+     _tokenBalance += amount;
+     _tokenHistory.insert(0, {'titulo': reason, 'valor': '+$amount'});
+-- 
+2.43.0
+

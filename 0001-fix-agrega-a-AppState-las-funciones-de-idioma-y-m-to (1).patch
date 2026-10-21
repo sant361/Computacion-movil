@@ -1,0 +1,479 @@
+From e48e18d6e74b6ac99ed6b0d99a0b1fbd3c8b6164 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 21 Oct 2026 17:06:44 -0500
+Subject: [PATCH] =?UTF-8?q?fix:=20agrega=20a=20AppState=20las=20funciones?=
+ =?UTF-8?q?=20de=20idioma=20y=20m=C3=A9todos=20de=20pago=20que=20faltaban?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+La pantalla de Idioma y las pruebas de pago/idioma (agregadas por JhanAngel)
+esperaban que AppState tuviera languageCode/setLanguage y
+paymentMethods/loadPaymentMethods/addPaymentMethod/setDefaultPaymentMethod/
+removePaymentMethod, pero esas funciones nunca se habían implementado, por
+lo que el proyecto no compilaba (42 problemas en flutter analyze).
+
+- Agrega soporte de idioma persistido (es/en/fr) en AppState.
+- Agrega métodos de pago persistidos por cuenta en AppState (solo se
+  guardan los últimos 4 dígitos, nunca el número completo ni el CVV).
+- Conecta payment_methods_screen.dart y add_payment_method_screen.dart
+  a AppState en vez de usar datos de ejemplo fijos.
+- Corrige los withOpacity() restantes (deprecated) y los avisos de
+  "usa const" que también hacían fallar flutter analyze.
+---
+ lib/screens/content_detail_screen.dart        |   4 +-
+ lib/screens/home_screen.dart                  |   6 +-
+ lib/screens/menu_screen.dart                  |   4 +-
+ .../payments/add_payment_method_screen.dart   |  21 +++-
+ .../payments/payment_methods_screen.dart      | 103 ++++++++++--------
+ lib/screens/payments/payment_screen.dart      |   2 +-
+ lib/screens/payments/subscription_screen.dart |  14 ++-
+ lib/screens/tokens/earn_tokens_screen.dart    |   4 +-
+ lib/state/app_state.dart                      | 102 +++++++++++++++++
+ 9 files changed, 195 insertions(+), 65 deletions(-)
+
+diff --git a/lib/screens/content_detail_screen.dart b/lib/screens/content_detail_screen.dart
+index 573e1d5..438d445 100644
+--- a/lib/screens/content_detail_screen.dart
++++ b/lib/screens/content_detail_screen.dart
+@@ -31,9 +31,9 @@ class ContentDetailScreen extends StatelessWidget {
+                 const SizedBox(height: 4),
+                 const Text('2026 · 3 temporadas · +14', style: TextStyle(color: Colors.grey)),
+                 const SizedBox(height: 8),
+-                Wrap(
++                const Wrap(
+                   spacing: 8,
+-                  children: const [
++                  children: [
+                     Chip(label: Text('Drama')),
+                     Chip(label: Text('Suspenso')),
+                     Chip(label: Text('Acción')),
+diff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart
+index 43c2929..7a101bf 100644
+--- a/lib/screens/home_screen.dart
++++ b/lib/screens/home_screen.dart
+@@ -286,7 +286,7 @@ class _FeaturedCard extends StatelessWidget {
+                     height: 245,
+                     decoration: BoxDecoration(
+                       shape: BoxShape.circle,
+-                      color: const Color(0xFF65D5C4).withOpacity(0.16),
++                      color: const Color(0xFF65D5C4).withValues(alpha: 0.16),
+                     ),
+                   ),
+                 ),
+@@ -376,7 +376,7 @@ class _FeaturedCard extends StatelessWidget {
+                             onPressed: onTap,
+                             style: IconButton.styleFrom(
+                               foregroundColor: Colors.white,
+-                              backgroundColor: Colors.white.withOpacity(0.16),
++                              backgroundColor: Colors.white.withValues(alpha: 0.16),
+                             ),
+                             icon: const Icon(Icons.add_rounded),
+                           ),
+@@ -482,7 +482,7 @@ class _PosterSection extends StatelessWidget {
+                                     vertical: 4,
+                                   ),
+                                   decoration: BoxDecoration(
+-                                    color: Colors.black.withOpacity(0.35),
++                                    color: Colors.black.withValues(alpha: 0.35),
+                                     borderRadius: BorderRadius.circular(6),
+                                   ),
+                                   child: const Text(
+diff --git a/lib/screens/menu_screen.dart b/lib/screens/menu_screen.dart
+index d5b2aff..c6d6342 100644
+--- a/lib/screens/menu_screen.dart
++++ b/lib/screens/menu_screen.dart
+@@ -32,9 +32,9 @@ class MenuScreen extends StatelessWidget {
+           const SizedBox(height: 8),
+           const Text('Tipo', style: TextStyle(fontWeight: FontWeight.bold)),
+           const SizedBox(height: 8),
+-          Wrap(
++          const Wrap(
+             spacing: 8,
+-            children: const [
++            children: [
+               Chip(label: Text('Películas')),
+               Chip(label: Text('Series')),
+               Chip(label: Text('Documentales')),
+diff --git a/lib/screens/payments/add_payment_method_screen.dart b/lib/screens/payments/add_payment_method_screen.dart
+index 2ec8f24..ef71187 100644
+--- a/lib/screens/payments/add_payment_method_screen.dart
++++ b/lib/screens/payments/add_payment_method_screen.dart
+@@ -1,5 +1,6 @@
+ import 'package:flutter/material.dart';
+ import 'package:flutter/services.dart';
++import '../../state/app_state.dart';
+ import '../../widgets/primary_button.dart';
+ 
+ /// Req. 11: formulario para agregar un nuevo método de pago.
+@@ -27,9 +28,25 @@ class _AddPaymentMethodScreenState extends State<AddPaymentMethodScreen> {
+     super.dispose();
+   }
+ 
+-  void _submit() {
++  /// Identifica la marca de la tarjeta por su primer dígito, solo para
++  /// mostrarla en pantalla (no hay cobro ni validación real con un banco).
++  String _brandFromCardNumber(String cardNumber) {
++    if (cardNumber.startsWith('4')) return 'Visa';
++    if (cardNumber.startsWith('5')) return 'Mastercard';
++    return 'Tarjeta';
++  }
++
++  Future<void> _submit() async {
+     if (_formKey.currentState!.validate()) {
+-      // TODO: validar y enviar los datos de la tarjeta al backend de pagos.
++      final cardNumber = _cardNumberController.text;
++      await appState.addPaymentMethod(
++        last4: cardNumber.substring(cardNumber.length - 4),
++        brand: _brandFromCardNumber(cardNumber),
++        expiry: _expiryController.text,
++        holder: _nameController.text.trim(),
++        isDefault: _saveAsDefault,
++      );
++      if (!mounted) return;
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(content: Text('Método de pago guardado')),
+       );
+diff --git a/lib/screens/payments/payment_methods_screen.dart b/lib/screens/payments/payment_methods_screen.dart
+index ba8f6fd..fb862a3 100644
+--- a/lib/screens/payments/payment_methods_screen.dart
++++ b/lib/screens/payments/payment_methods_screen.dart
+@@ -1,27 +1,18 @@
+ import 'package:flutter/material.dart';
++import '../../state/app_state.dart';
+ import 'add_payment_method_screen.dart';
+ 
+-/// Req. 11: gestión de métodos de pago.
+-class PaymentMethodsScreen extends StatefulWidget {
++/// Req. 11: gestión de métodos de pago, conectada a AppState (persistida
++/// por cuenta, sin guardar nunca el número completo ni el CVV).
++class PaymentMethodsScreen extends StatelessWidget {
+   const PaymentMethodsScreen({super.key});
+ 
+-  @override
+-  State<PaymentMethodsScreen> createState() => _PaymentMethodsScreenState();
+-}
+-
+-class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
+-  final List<Map<String, String>> _methods = [
+-    {'nombre': 'Visa •••• 4242', 'detalle': 'Vence 08/28 · Principal'},
+-    {'nombre': 'Mastercard •••• 1881', 'detalle': 'Vence 03/27'},
+-    {'nombre': 'Billetera digital', 'detalle': 'Vinculada'},
+-  ];
+-
+-  Future<void> _confirmDelete(int index) async {
++  Future<void> _confirmDelete(BuildContext context, Map<String, String> method) async {
+     final confirmed = await showDialog<bool>(
+       context: context,
+       builder: (_) => AlertDialog(
+         title: const Text('¿Eliminar este método?'),
+-        content: Text('Se eliminará "${_methods[index]['nombre']}" de tu cuenta.'),
++        content: Text('Se eliminará "${method['nombre']}" de tu cuenta.'),
+         actions: [
+           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+           TextButton(
+@@ -32,7 +23,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
+       ),
+     );
+     if (confirmed == true) {
+-      setState(() => _methods.removeAt(index));
++      await appState.removePaymentMethod(method['id']!);
+     }
+   }
+ 
+@@ -40,42 +31,58 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
+   Widget build(BuildContext context) {
+     return Scaffold(
+       appBar: AppBar(title: const Text('Métodos de pago')),
+-      body: ListView(
+-        padding: const EdgeInsets.all(16),
+-        children: [
+-          ..._methods.asMap().entries.map(
+-                (entry) => Card(
+-                  child: ListTile(
+-                    leading: const Icon(Icons.credit_card),
+-                    title: Text(entry.value['nombre']!),
+-                    subtitle: Text(entry.value['detalle']!),
+-                    trailing: Row(
+-                      mainAxisSize: MainAxisSize.min,
+-                      children: [
+-                        IconButton(
+-                          icon: const Icon(Icons.edit, size: 18),
+-                          onPressed: () {
+-                            // TODO: abrir formulario de edición con los datos actuales.
+-                          },
+-                        ),
+-                        IconButton(
+-                          icon: const Icon(Icons.delete_outline, size: 18),
+-                          onPressed: () => _confirmDelete(entry.key),
+-                        ),
+-                      ],
++      body: ListenableBuilder(
++        listenable: appState,
++        builder: (context, _) {
++          final methods = appState.paymentMethods;
++          return ListView(
++            padding: const EdgeInsets.all(16),
++            children: [
++              if (methods.isEmpty)
++                const Padding(
++                  padding: EdgeInsets.symmetric(vertical: 32),
++                  child: Center(
++                    child: Text(
++                      'No tienes métodos de pago guardados',
++                      style: TextStyle(color: Colors.grey),
+                     ),
+                   ),
++                )
++              else
++                ...methods.map(
++                  (method) => Card(
++                    child: ListTile(
++                      leading: const Icon(Icons.credit_card),
++                      title: Text(method['nombre']!),
++                      subtitle: Text(method['detalle']!),
++                      trailing: Row(
++                        mainAxisSize: MainAxisSize.min,
++                        children: [
++                          if (method['principal'] == 'true')
++                            const Padding(
++                              padding: EdgeInsets.only(right: 4),
++                              child: Text('Principal', style: TextStyle(fontSize: 11, color: Colors.green)),
++                            ),
++                          IconButton(
++                            icon: const Icon(Icons.delete_outline, size: 18),
++                            onPressed: () => _confirmDelete(context, method),
++                          ),
++                        ],
++                      ),
++                    ),
++                  ),
++                ),
++              const SizedBox(height: 8),
++              OutlinedButton(
++                onPressed: () => Navigator.push(
++                  context,
++                  MaterialPageRoute(builder: (_) => const AddPaymentMethodScreen()),
+                 ),
++                child: const Text('+ Agregar método'),
+               ),
+-          const SizedBox(height: 8),
+-          OutlinedButton(
+-            onPressed: () => Navigator.push(
+-              context,
+-              MaterialPageRoute(builder: (_) => const AddPaymentMethodScreen()),
+-            ),
+-            child: const Text('+ Agregar método'),
+-          ),
+-        ],
++            ],
++          );
++        },
+       ),
+     );
+   }
+diff --git a/lib/screens/payments/payment_screen.dart b/lib/screens/payments/payment_screen.dart
+index 19c1a9b..c836856 100644
+--- a/lib/screens/payments/payment_screen.dart
++++ b/lib/screens/payments/payment_screen.dart
+@@ -44,7 +44,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
+           ),
+           Row(
+             children: [
+-              Expanded(child: TextField(decoration: InputDecoration(hintText: 'Código promocional'))),
++              const Expanded(child: TextField(decoration: InputDecoration(hintText: 'Código promocional'))),
+               const SizedBox(width: 8),
+               OutlinedButton(
+                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+diff --git a/lib/screens/payments/subscription_screen.dart b/lib/screens/payments/subscription_screen.dart
+index 49a7f6f..4a603f3 100644
+--- a/lib/screens/payments/subscription_screen.dart
++++ b/lib/screens/payments/subscription_screen.dart
+@@ -26,11 +26,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
+       body: ListView(
+         padding: const EdgeInsets.all(16),
+         children: [
+-          Card(
++          const Card(
+             child: ListTile(
+-              title: const Text('Estándar', style: TextStyle(fontWeight: FontWeight.bold)),
+-              subtitle: const Text('Renueva el 00/00/0000'),
+-              trailing: const Text('\$00.000/mes'),
++              title: Text('Estándar', style: TextStyle(fontWeight: FontWeight.bold)),
++              subtitle: Text('Renueva el 00/00/0000'),
++              trailing: Text('\$00.000/mes'),
+             ),
+           ),
+           SwitchListTile(
+@@ -81,7 +81,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
+           ListTile(
+             title: const Text('Métodos de pago'),
+             trailing: const Icon(Icons.chevron_right),
+-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentMethodsScreen())),
++            onTap: () async {
++              await appState.loadPaymentMethods(FirebaseAuth.instance.currentUser?.uid ?? 'local');
++              if (!context.mounted) return;
++              Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()));
++            },
+           ),
+           ListTile(
+             title: const Text('Facturación'),
+diff --git a/lib/screens/tokens/earn_tokens_screen.dart b/lib/screens/tokens/earn_tokens_screen.dart
+index 3d7a858..66815df 100644
+--- a/lib/screens/tokens/earn_tokens_screen.dart
++++ b/lib/screens/tokens/earn_tokens_screen.dart
+@@ -44,8 +44,8 @@ class EarnTokensScreen extends StatelessWidget {
+               child: const Text('VER ANUNCIO'),
+             ),
+             const SizedBox(height: 16),
+-            Row(
+-              children: const [
++            const Row(
++              children: [
+                 Expanded(child: Divider()),
+                 Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('o', style: TextStyle(color: Colors.grey))),
+                 Expanded(child: Divider()),
+diff --git a/lib/state/app_state.dart b/lib/state/app_state.dart
+index 3ceea50..bdf036c 100644
+--- a/lib/state/app_state.dart
++++ b/lib/state/app_state.dart
+@@ -1,3 +1,4 @@
++import 'dart:convert';
+ import 'package:flutter/foundation.dart';
+ import 'package:shared_preferences/shared_preferences.dart';
+ 
+@@ -16,9 +17,18 @@ class AppState extends ChangeNotifier {
+   static const _myListKey = 'myList';
+   static const _isLoggedInKey = 'isLoggedIn';
+   static const _downloadsKey = 'downloads';
++  static const _languageCodeKey = 'languageCode';
++  static const _supportedLanguages = {'es', 'en', 'fr'};
+ 
+   SharedPreferences? _prefs;
+ 
++  String _languageCode = 'es';
++  String get languageCode => _languageCode;
++
++  String? _paymentUserId;
++  List<Map<String, String>> _paymentMethods = [];
++  List<Map<String, String>> get paymentMethods => List.unmodifiable(_paymentMethods);
++
+   bool _isLoggedIn = false;
+   bool get isLoggedIn => _isLoggedIn;
+ 
+@@ -47,6 +57,7 @@ class AppState extends ChangeNotifier {
+     _prefs = await SharedPreferences.getInstance();
+     _tokenBalance = _prefs!.getInt(_tokenBalanceKey) ?? _tokenBalance;
+     _isLoggedIn = _prefs!.getBool(_isLoggedInKey) ?? false;
++    _languageCode = _prefs!.getString(_languageCodeKey) ?? _languageCode;
+     final savedList = _prefs!.getStringList(_myListKey);
+     if (savedList != null) {
+       _myList
+@@ -93,6 +104,8 @@ class AppState extends ChangeNotifier {
+ 
+   Future<void> logout() async {
+     _isLoggedIn = false;
++    _paymentUserId = null;
++    _paymentMethods = [];
+     notifyListeners();
+     final prefs = _prefs ??= await SharedPreferences.getInstance();
+     await prefs.setBool(_isLoggedInKey, false);
+@@ -123,6 +136,95 @@ class AppState extends ChangeNotifier {
+     notifyListeners();
+     _persist();
+   }
++
++  /// Cambia el idioma de la app si [code] es uno de los soportados
++  /// ('es', 'en', 'fr'). Un código desconocido se ignora y se conserva
++  /// el idioma actual.
++  Future<void> setLanguage(String code) async {
++    if (!_supportedLanguages.contains(code)) return;
++    _languageCode = code;
++    notifyListeners();
++    final prefs = _prefs ??= await SharedPreferences.getInstance();
++    await prefs.setString(_languageCodeKey, code);
++  }
++
++  String _paymentMethodsKey(String userId) => 'paymentMethods:$userId';
++
++  /// Carga los métodos de pago guardados para [userId]. Se guardan por
++  /// cuenta (nunca el número completo ni el CVV, solo los últimos 4
++  /// dígitos) para que cada usuario vea solo los suyos.
++  Future<void> loadPaymentMethods(String userId) async {
++    _paymentUserId = userId;
++    final prefs = _prefs ??= await SharedPreferences.getInstance();
++    final raw = prefs.getString(_paymentMethodsKey(userId));
++    if (raw == null) {
++      _paymentMethods = [];
++    } else {
++      final decoded = jsonDecode(raw) as List;
++      _paymentMethods = decoded
++          .map((e) => Map<String, String>.from(e as Map))
++          .toList();
++    }
++    notifyListeners();
++  }
++
++  Future<void> _persistPaymentMethods() async {
++    final userId = _paymentUserId;
++    if (userId == null) return;
++    final prefs = _prefs ??= await SharedPreferences.getInstance();
++    await prefs.setString(_paymentMethodsKey(userId), jsonEncode(_paymentMethods));
++  }
++
++  /// Agrega un método de pago nuevo. Solo se guardan los últimos 4
++  /// dígitos de la tarjeta, nunca el número completo ni el CVV.
++  Future<void> addPaymentMethod({
++    required String last4,
++    required String brand,
++    required String expiry,
++    required String holder,
++    required bool isDefault,
++  }) async {
++    if (isDefault) {
++      for (final m in _paymentMethods) {
++        m['principal'] = 'false';
++      }
++    }
++    final id = '${DateTime.now().microsecondsSinceEpoch}_${_paymentMethods.length}';
++    _paymentMethods.add({
++      'id': id,
++      'nombre': '$brand •••• $last4',
++      'detalle': 'Vence $expiry',
++      'last4': last4,
++      'brand': brand,
++      'expiry': expiry,
++      'holder': holder,
++      'principal': (isDefault || _paymentMethods.isEmpty) ? 'true' : 'false',
++    });
++    notifyListeners();
++    await _persistPaymentMethods();
++  }
++
++  /// Marca [id] como el método principal y desmarca los demás.
++  Future<void> setDefaultPaymentMethod(String id) async {
++    for (final m in _paymentMethods) {
++      m['principal'] = (m['id'] == id) ? 'true' : 'false';
++    }
++    notifyListeners();
++    await _persistPaymentMethods();
++  }
++
++  /// Elimina el método [id]. Si era el principal y quedan otros métodos,
++  /// el primero que queda pasa a ser el nuevo principal.
++  Future<void> removePaymentMethod(String id) async {
++    final removed = _paymentMethods.firstWhere((m) => m['id'] == id, orElse: () => <String, String>{});
++    final wasDefault = removed['principal'] == 'true';
++    _paymentMethods.removeWhere((m) => m['id'] == id);
++    if (wasDefault && _paymentMethods.isNotEmpty) {
++      _paymentMethods.first['principal'] = 'true';
++    }
++    notifyListeners();
++    await _persistPaymentMethods();
++  }
+ }
+ 
+ /// Instancia única compartida por toda la app.
+-- 
+2.43.0
+

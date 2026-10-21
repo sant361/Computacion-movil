@@ -1,0 +1,163 @@
+From 3ddbed472264d08942991f64a186ec1b31723924 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Thu, 15 Oct 2026 04:43:44 +0000
+Subject: [PATCH] feat: guarda el saldo de tokens y Mi lista en el dispositivo
+ con shared_preferences
+
+---
+ lib/main.dart            | 31 ++++++++++++++++++++++++++---
+ lib/state/app_state.dart | 43 ++++++++++++++++++++++++++++++++++------
+ pubspec.yaml             |  1 +
+ 3 files changed, 66 insertions(+), 9 deletions(-)
+
+diff --git a/lib/main.dart b/lib/main.dart
+index 9fa5b1e..212d89f 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,7 +1,12 @@
+ import 'package:flutter/material.dart';
+ import 'screens/auth/login_screen.dart';
++import 'state/app_state.dart';
+ 
+-void main() => runApp(const StreamingApp());
++void main() {
++  // Asegura que los plugins (como shared_preferences) estén listos antes de usarlos.
++  WidgetsFlutterBinding.ensureInitialized();
++  runApp(const StreamingApp());
++}
+ 
+ class StreamingApp extends StatelessWidget {
+   const StreamingApp({super.key});
+@@ -15,8 +20,28 @@ class StreamingApp extends StatelessWidget {
+         colorSchemeSeed: const Color(0xFF3D5A80),
+         useMaterial3: true,
+       ),
+-      // TODO: una vez tengas el login real, navega a HomeScreen tras autenticar.
+-      home: const LoginScreen(),
++      home: const _AppStartup(),
++    );
++  }
++}
++
++/// Carga el estado guardado (tokens, Mi lista) antes de mostrar el Login,
++/// para que la app abra ya con los datos reales del dispositivo.
++class _AppStartup extends StatelessWidget {
++  const _AppStartup();
++
++  @override
++  Widget build(BuildContext context) {
++    return FutureBuilder<void>(
++      future: appState.load(),
++      builder: (context, snapshot) {
++        if (snapshot.connectionState != ConnectionState.done) {
++          return const Scaffold(body: Center(child: CircularProgressIndicator()));
++        }
++        // TODO: una vez tengas el login real, revisa aquí si ya hay una sesión
++        // guardada y navega directo a HomeScreen en vez de pedir Login otra vez.
++        return const LoginScreen();
++      },
+     );
+   }
+ }
+diff --git a/lib/state/app_state.dart b/lib/state/app_state.dart
+index b41ebe4..58a953b 100644
+--- a/lib/state/app_state.dart
++++ b/lib/state/app_state.dart
+@@ -1,11 +1,22 @@
+ import 'package:flutter/foundation.dart';
++import 'package:shared_preferences/shared_preferences.dart';
+ 
+ /// Estado compartido simple de la app (sin paquetes externos de estado).
+ ///
+ /// [appState] es una única instancia global: cualquier pantalla puede leer
+ /// appState.tokenBalance, y escuchar cambios envolviendo su UI en un
+ /// ListenableBuilder(listenable: appState, builder: (...) => ...).
++///
++/// El saldo de tokens y "Mi lista" se guardan en el almacenamiento local del
++/// dispositivo (shared_preferences), así que sobreviven a cerrar la app.
++/// El historial de movimientos de tokens NO se guarda (queda solo en memoria)
++/// para mantener esto simple; guardarlo sería el siguiente paso natural.
+ class AppState extends ChangeNotifier {
++  static const _tokenBalanceKey = 'tokenBalance';
++  static const _myListKey = 'myList';
++
++  SharedPreferences? _prefs;
++
+   int _tokenBalance = 1250;
+   int get tokenBalance => _tokenBalance;
+ 
+@@ -16,10 +27,34 @@ class AppState extends ChangeNotifier {
+   ];
+   List<Map<String, String>> get tokenHistory => List.unmodifiable(_tokenHistory);
+ 
++  final Set<String> _myList = {};
++  bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
++
++  /// Carga el estado guardado en el dispositivo. Llamar una vez al inicio,
++  /// antes de runApp(), para que la app abra ya con los datos reales.
++  Future<void> load() async {
++    _prefs = await SharedPreferences.getInstance();
++    _tokenBalance = _prefs!.getInt(_tokenBalanceKey) ?? _tokenBalance;
++    final savedList = _prefs!.getStringList(_myListKey);
++    if (savedList != null) {
++      _myList
++        ..clear()
++        ..addAll(savedList);
++    }
++    notifyListeners();
++  }
++
++  Future<void> _persist() async {
++    final prefs = _prefs ??= await SharedPreferences.getInstance();
++    await prefs.setInt(_tokenBalanceKey, _tokenBalance);
++    await prefs.setStringList(_myListKey, _myList.toList());
++  }
++
+   void addTokens(int amount, {required String reason}) {
+     _tokenBalance += amount;
+     _tokenHistory.insert(0, {'titulo': reason, 'valor': '+$amount'});
+     notifyListeners();
++    _persist();
+   }
+ 
+   bool spendTokens(int amount, {required String reason}) {
+@@ -27,15 +62,10 @@ class AppState extends ChangeNotifier {
+     _tokenBalance -= amount;
+     _tokenHistory.insert(0, {'titulo': reason, 'valor': '-$amount'});
+     notifyListeners();
++    _persist();
+     return true;
+   }
+ 
+-  // "Mi lista": identifica cada contenido por su título. En una versión con
+-  // backend real, esto sería el id del contenido en vez del título.
+-  final Set<String> _myList = {};
+-
+-  bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
+-
+   void toggleMyList(String contentTitle) {
+     if (_myList.contains(contentTitle)) {
+       _myList.remove(contentTitle);
+@@ -43,6 +73,7 @@ class AppState extends ChangeNotifier {
+       _myList.add(contentTitle);
+     }
+     notifyListeners();
++    _persist();
+   }
+ }
+ 
+diff --git a/pubspec.yaml b/pubspec.yaml
+index 63e40ed..3993dc0 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -11,6 +11,7 @@ dependencies:
+     sdk: flutter
+   cupertino_icons: ^1.0.6
+   video_player: ^2.9.2
++  shared_preferences: ^2.3.2
+ 
+ dev_dependencies:
+   flutter_test:
+-- 
+2.43.0
+

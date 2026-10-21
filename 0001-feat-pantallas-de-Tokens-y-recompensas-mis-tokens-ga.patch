@@ -1,0 +1,527 @@
+From 7610d7bbd23416234f7726f562e0210af84542f1 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Wed, 14 Oct 2026 02:19:20 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20pantallas=20de=20Tokens=20y=20recompens?=
+ =?UTF-8?q?as=20(mis=20tokens,=20ganar=20tokens,=20juegos,=20desbloqueo)?=
+ =?UTF-8?q?=20y=20las=20conecta=20a=20la=20navegaci=C3=B3n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/content_detail_screen.dart        | 10 +++
+ lib/screens/home_screen.dart                  |  9 ++
+ lib/screens/tokens/access_options_screen.dart | 68 +++++++++++++++
+ lib/screens/tokens/earn_tokens_screen.dart    | 69 +++++++++++++++
+ lib/screens/tokens/game_result_screen.dart    | 72 ++++++++++++++++
+ lib/screens/tokens/games_screen.dart          | 50 +++++++++++
+ lib/screens/tokens/tokens_screen.dart         | 64 ++++++++++++++
+ lib/screens/tokens/unlock_confirm_screen.dart | 84 +++++++++++++++++++
+ 8 files changed, 426 insertions(+)
+ create mode 100644 lib/screens/tokens/access_options_screen.dart
+ create mode 100644 lib/screens/tokens/earn_tokens_screen.dart
+ create mode 100644 lib/screens/tokens/game_result_screen.dart
+ create mode 100644 lib/screens/tokens/games_screen.dart
+ create mode 100644 lib/screens/tokens/tokens_screen.dart
+ create mode 100644 lib/screens/tokens/unlock_confirm_screen.dart
+
+diff --git a/lib/screens/content_detail_screen.dart b/lib/screens/content_detail_screen.dart
+index 3d3483d..c4df7dc 100644
+--- a/lib/screens/content_detail_screen.dart
++++ b/lib/screens/content_detail_screen.dart
+@@ -1,5 +1,6 @@
+ import 'package:flutter/material.dart';
+ import 'player_screen.dart';
++import 'tokens/access_options_screen.dart';
+ 
+ /// Req. 19: ficha de un contenido (serie/película) antes de reproducir.
+ class ContentDetailScreen extends StatefulWidget {
+@@ -83,6 +84,15 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
+                     ),
+                   ],
+                 ),
++                const SizedBox(height: 12),
++                TextButton.icon(
++                  icon: const Icon(Icons.lock_outline, size: 18),
++                  label: const Text('Este episodio está restringido'),
++                  onPressed: () => Navigator.push(
++                    context,
++                    MaterialPageRoute(builder: (_) => const AccessOptionsScreen()),
++                  ),
++                ),
+               ]),
+             ),
+           ),
+diff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart
+index 49725a3..7452f81 100644
+--- a/lib/screens/home_screen.dart
++++ b/lib/screens/home_screen.dart
+@@ -5,6 +5,7 @@ import 'content_detail_screen.dart';
+ import 'payments/subscription_screen.dart';
+ import 'catalog/notifications_screen.dart';
+ import 'catalog/downloads_screen.dart';
++import 'tokens/tokens_screen.dart';
+ 
+ /// Req. 17, 28, 39: pantalla de inicio con sugerencias, seguir viendo y recomendaciones.
+ class HomeScreen extends StatelessWidget {
+@@ -52,6 +53,14 @@ class HomeScreen extends StatelessWidget {
+           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MenuScreen())),
+         ),
+         actions: [
++          IconButton(
++            icon: const Icon(Icons.stars_outlined),
++            tooltip: 'Mis tokens',
++            onPressed: () => Navigator.push(
++              context,
++              MaterialPageRoute(builder: (_) => const TokensScreen()),
++            ),
++          ),
+           IconButton(
+             icon: const Icon(Icons.notifications_outlined),
+             tooltip: 'Notificaciones',
+diff --git a/lib/screens/tokens/access_options_screen.dart b/lib/screens/tokens/access_options_screen.dart
+new file mode 100644
+index 0000000..0b24482
+--- /dev/null
++++ b/lib/screens/tokens/access_options_screen.dart
+@@ -0,0 +1,68 @@
++import 'package:flutter/material.dart';
++import 'unlock_confirm_screen.dart';
++import 'earn_tokens_screen.dart';
++import '../payments/plans_screen.dart';
++
++/// Req. 84, 87, 88: alternativas de acceso cuando un capítulo está restringido.
++class AccessOptionsScreen extends StatelessWidget {
++  const AccessOptionsScreen({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Capítulo restringido')),
++      body: Padding(
++        padding: const EdgeInsets.all(16),
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: [
++            const Padding(
++              padding: EdgeInsets.symmetric(vertical: 8),
++              child: Text('Elige cómo quieres continuar', textAlign: TextAlign.center),
++            ),
++            const SizedBox(height: 8),
++            Card(
++              child: ListTile(
++                title: const Text('Desbloquear con tokens', style: TextStyle(fontWeight: FontWeight.bold)),
++                subtitle: const Text('120 tokens'),
++                trailing: const Icon(Icons.chevron_right),
++                onTap: () => Navigator.push(
++                  context,
++                  MaterialPageRoute(builder: (_) => const UnlockConfirmScreen()),
++                ),
++              ),
++            ),
++            Card(
++              child: ListTile(
++                title: const Text('Obtener tokens', style: TextStyle(fontWeight: FontWeight.bold)),
++                subtitle: const Text('Ver anuncio o jugar'),
++                trailing: const Icon(Icons.chevron_right),
++                onTap: () => Navigator.push(
++                  context,
++                  MaterialPageRoute(builder: (_) => const EarnTokensScreen()),
++                ),
++              ),
++            ),
++            Card(
++              child: ListTile(
++                title: const Text('Contratar un plan', style: TextStyle(fontWeight: FontWeight.bold)),
++                subtitle: const Text('Acceso ilimitado'),
++                trailing: const Icon(Icons.chevron_right),
++                onTap: () => Navigator.push(
++                  context,
++                  MaterialPageRoute(builder: (_) => const PlansScreen()),
++                ),
++              ),
++            ),
++            const SizedBox(height: 16),
++            const Text(
++              'No tienes suficientes tokens para este capítulo.',
++              textAlign: TextAlign.center,
++              style: TextStyle(fontSize: 12, color: Colors.grey),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/tokens/earn_tokens_screen.dart b/lib/screens/tokens/earn_tokens_screen.dart
+new file mode 100644
+index 0000000..2bdc7fe
+--- /dev/null
++++ b/lib/screens/tokens/earn_tokens_screen.dart
+@@ -0,0 +1,69 @@
++import 'package:flutter/material.dart';
++import 'games_screen.dart';
++
++/// Req. 77, 78: ver un anuncio a cambio de tokens.
++class EarnTokensScreen extends StatelessWidget {
++  const EarnTokensScreen({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Ganar tokens')),
++      body: Padding(
++        padding: const EdgeInsets.all(24),
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: [
++            AspectRatio(
++              aspectRatio: 16 / 9,
++              child: Container(
++                decoration: BoxDecoration(color: const Color(0xFFEEF0F4), borderRadius: BorderRadius.circular(10)),
++                child: const Icon(Icons.play_circle_outline, size: 48),
++              ),
++            ),
++            const SizedBox(height: 16),
++            const Text('Ver anuncio y ganar tokens',
++                textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
++            const SizedBox(height: 8),
++            const Text(
++              'Recibe 50 tokens al completar la reproducción del anuncio.',
++              textAlign: TextAlign.center,
++              style: TextStyle(color: Colors.grey),
++            ),
++            const SizedBox(height: 24),
++            ElevatedButton(
++              onPressed: () {
++                // TODO: reproducir el anuncio real y acreditar tokens al backend.
++                ScaffoldMessenger.of(context).showSnackBar(
++                  const SnackBar(content: Text('+50 tokens acreditados')),
++                );
++                Navigator.pop(context);
++              },
++              child: const Text('VER ANUNCIO'),
++            ),
++            const SizedBox(height: 16),
++            Row(
++              children: const [
++                Expanded(child: Divider()),
++                Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('o', style: TextStyle(color: Colors.grey))),
++                Expanded(child: Divider()),
++              ],
++            ),
++            const SizedBox(height: 16),
++            OutlinedButton(
++              onPressed: () => Navigator.pushReplacement(
++                context,
++                MaterialPageRoute(builder: (_) => const GamesScreen()),
++              ),
++              child: const Text('Ganar tokens con juegos'),
++            ),
++            const SizedBox(height: 24),
++            const Center(
++              child: Text('Límite diario: 4 anuncios', style: TextStyle(fontSize: 12, color: Colors.grey)),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/tokens/game_result_screen.dart b/lib/screens/tokens/game_result_screen.dart
+new file mode 100644
+index 0000000..0c04864
+--- /dev/null
++++ b/lib/screens/tokens/game_result_screen.dart
+@@ -0,0 +1,72 @@
++import 'package:flutter/material.dart';
++import 'tokens_screen.dart';
++
++/// Req. 79, 80: resultado tras jugar un minijuego y tokens ganados.
++class GameResultScreen extends StatelessWidget {
++  final String gameName;
++  final int tokensEarned;
++
++  const GameResultScreen({super.key, required this.gameName, required this.tokensEarned});
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      body: SafeArea(
++        child: Padding(
++          padding: const EdgeInsets.all(24),
++          child: Column(
++            children: [
++              const SizedBox(height: 32),
++              const Icon(Icons.star, size: 56, color: Color(0xFFEBC86E)),
++              const SizedBox(height: 16),
++              const Text('¡Buen trabajo!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
++              const SizedBox(height: 4),
++              Text('Completaste $gameName', style: const TextStyle(color: Colors.grey)),
++              const SizedBox(height: 24),
++              Card(
++                child: Padding(
++                  padding: const EdgeInsets.all(16),
++                  child: Column(
++                    children: [
++                      _resultRow('Aciertos', '8 / 10'),
++                      const Divider(),
++                      _resultRow('Tiempo', '01:42'),
++                      const Divider(),
++                      _resultRow('Tokens ganados', '+$tokensEarned'),
++                    ],
++                  ),
++                ),
++              ),
++              const Spacer(),
++              OutlinedButton(
++                onPressed: () => Navigator.pushReplacement(
++                  context,
++                  MaterialPageRoute(builder: (_) => const TokensScreen()),
++                ),
++                child: const Text('Ver historial'),
++              ),
++              const SizedBox(height: 12),
++              ElevatedButton(
++                onPressed: () => Navigator.pop(context),
++                child: const Text('JUGAR OTRA VEZ'),
++              ),
++            ],
++          ),
++        ),
++      ),
++    );
++  }
++
++  Widget _resultRow(String label, String value) {
++    return Padding(
++      padding: const EdgeInsets.symmetric(vertical: 4),
++      child: Row(
++        mainAxisAlignment: MainAxisAlignment.spaceBetween,
++        children: [
++          Text(label, style: const TextStyle(color: Colors.grey)),
++          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/tokens/games_screen.dart b/lib/screens/tokens/games_screen.dart
+new file mode 100644
+index 0000000..933952f
+--- /dev/null
++++ b/lib/screens/tokens/games_screen.dart
+@@ -0,0 +1,50 @@
++import 'package:flutter/material.dart';
++import 'game_result_screen.dart';
++
++/// Req. 79: catálogo de minijuegos para ganar tokens.
++class GamesScreen extends StatelessWidget {
++  const GamesScreen({super.key});
++
++  static const games = [
++    {'nombre': 'Trivia de series', 'rango': '+30 a +80', 'tokens': 80},
++    {'nombre': 'Memoria', 'rango': '+20 a +60', 'tokens': 60},
++    {'nombre': 'Rompecabezas', 'rango': '+40 a +100', 'tokens': 100},
++  ];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Elige un juego')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          ...games.map(
++            (g) => Card(
++              child: ListTile(
++                leading: const Icon(Icons.videogame_asset_outlined),
++                title: Text(g['nombre'] as String),
++                subtitle: Text('Tokens: ${g['rango']}'),
++                trailing: OutlinedButton(
++                  onPressed: () => Navigator.push(
++                    context,
++                    MaterialPageRoute(
++                      builder: (_) => GameResultScreen(
++                        gameName: g['nombre'] as String,
++                        tokensEarned: g['tokens'] as int,
++                      ),
++                    ),
++                  ),
++                  child: const Text('Jugar'),
++                ),
++              ),
++            ),
++          ),
++          const SizedBox(height: 8),
++          const Center(
++            child: Text('Disponible en todos los dispositivos', style: TextStyle(fontSize: 12, color: Colors.grey)),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/tokens/tokens_screen.dart b/lib/screens/tokens/tokens_screen.dart
+new file mode 100644
+index 0000000..b352128
+--- /dev/null
++++ b/lib/screens/tokens/tokens_screen.dart
+@@ -0,0 +1,64 @@
++import 'package:flutter/material.dart';
++import 'earn_tokens_screen.dart';
++import 'games_screen.dart';
++
++/// Req. 74, 75: saldo de tokens e historial.
++class TokensScreen extends StatelessWidget {
++  const TokensScreen({super.key});
++
++  static const int balance = 1250;
++
++  static const history = [
++    {'titulo': 'Anuncio visto', 'valor': '+50'},
++    {'titulo': 'Desbloqueo capítulo 12', 'valor': '-120'},
++    {'titulo': 'Juego · Trivia', 'valor': '+80'},
++  ];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Mis tokens')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          Card(
++            color: const Color(0xFFF7F3E9),
++            child: ListTile(
++              leading: const CircleAvatar(
++                backgroundColor: Color(0xFFEBC86E),
++                child: Text('T', style: TextStyle(fontWeight: FontWeight.bold)),
++              ),
++              title: const Text('Saldo disponible', style: TextStyle(color: Colors.grey)),
++              subtitle: const Text('$balance tokens', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
++            ),
++          ),
++          const SizedBox(height: 16),
++          OutlinedButton(
++            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EarnTokensScreen())),
++            child: const Text('Ver anuncio y ganar tokens'),
++          ),
++          const SizedBox(height: 8),
++          OutlinedButton(
++            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())),
++            child: const Text('Ganar tokens con juegos'),
++          ),
++          const Divider(height: 32),
++          const Text('Historial reciente', style: TextStyle(fontWeight: FontWeight.bold)),
++          ...history.map(
++            (h) => ListTile(
++              title: Text(h['titulo']!),
++              trailing: Text(
++                h['valor']!,
++                style: TextStyle(
++                  fontWeight: FontWeight.bold,
++                  color: h['valor']!.startsWith('+') ? Colors.green : Colors.red,
++                ),
++              ),
++              contentPadding: EdgeInsets.zero,
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/tokens/unlock_confirm_screen.dart b/lib/screens/tokens/unlock_confirm_screen.dart
+new file mode 100644
+index 0000000..671fb0c
+--- /dev/null
++++ b/lib/screens/tokens/unlock_confirm_screen.dart
+@@ -0,0 +1,84 @@
++import 'package:flutter/material.dart';
++
++/// Req. 82, 83: confirmar el desbloqueo de un capítulo con tokens.
++class UnlockConfirmScreen extends StatelessWidget {
++  final String chapterName;
++  final int cost;
++  final int currentBalance;
++
++  const UnlockConfirmScreen({
++    super.key,
++    this.chapterName = 'Capítulo 13',
++    this.cost = 120,
++    this.currentBalance = 1250,
++  });
++
++  @override
++  Widget build(BuildContext context) {
++    final remaining = currentBalance - cost;
++    final canAfford = remaining >= 0;
++
++    return Scaffold(
++      appBar: AppBar(title: const Text('Desbloquear capítulo')),
++      body: Padding(
++        padding: const EdgeInsets.all(24),
++        child: Column(
++          crossAxisAlignment: CrossAxisAlignment.stretch,
++          children: [
++            Card(
++              color: const Color(0xFFEEF0F4),
++              child: Padding(
++                padding: const EdgeInsets.all(16),
++                child: Column(
++                  children: [
++                    Text(chapterName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
++                    const SizedBox(height: 4),
++                    Text('Costo: $cost tokens'),
++                    Text('Saldo actual: $currentBalance', style: const TextStyle(color: Colors.grey)),
++                  ],
++                ),
++              ),
++            ),
++            const SizedBox(height: 24),
++            Text(
++              canAfford
++                  ? 'Saldo después del desbloqueo: $remaining tokens'
++                  : 'No tienes saldo suficiente para este capítulo.',
++              textAlign: TextAlign.center,
++              style: TextStyle(
++                fontWeight: FontWeight.bold,
++                color: canAfford ? Colors.black : Colors.red,
++              ),
++            ),
++            const SizedBox(height: 24),
++            Row(
++              children: [
++                Expanded(
++                  child: OutlinedButton(
++                    onPressed: () => Navigator.pop(context),
++                    child: const Text('Cancelar'),
++                  ),
++                ),
++                const SizedBox(width: 12),
++                Expanded(
++                  child: ElevatedButton(
++                    onPressed: canAfford
++                        ? () {
++                            // TODO: descontar tokens en el backend y desbloquear el capítulo.
++                            ScaffoldMessenger.of(context).showSnackBar(
++                              const SnackBar(content: Text('Capítulo desbloqueado')),
++                            );
++                            Navigator.pop(context);
++                          }
++                        : null,
++                    child: const Text('DESBLOQUEAR'),
++                  ),
++                ),
++              ],
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+-- 
+2.43.0
+

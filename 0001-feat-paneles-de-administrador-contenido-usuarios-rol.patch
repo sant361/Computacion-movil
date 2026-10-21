@@ -1,0 +1,481 @@
+From fefa7e62771ecf0c03b339849e0dd0ec2bcdf52b Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Wed, 14 Oct 2026 02:24:10 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20paneles=20de=20administrador=20(conteni?=
+ =?UTF-8?q?do,=20usuarios/roles,=20planes,=20promociones,=20anal=C3=ADtica?=
+ =?UTF-8?q?,=20regi=C3=B3n/seguridad)=20y=20los=20conecta=20a=20la=20naveg?=
+ =?UTF-8?q?aci=C3=B3n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/admin/admin_dashboard_screen.dart | 46 +++++++++++++
+ lib/screens/admin/analytics_panel_screen.dart | 57 ++++++++++++++++
+ lib/screens/admin/content_panel_screen.dart   | 65 +++++++++++++++++++
+ lib/screens/admin/plans_panel_screen.dart     | 49 ++++++++++++++
+ .../admin/promotions_panel_screen.dart        | 50 ++++++++++++++
+ lib/screens/admin/region_security_screen.dart | 55 ++++++++++++++++
+ lib/screens/admin/users_roles_screen.dart     | 59 +++++++++++++++++
+ lib/screens/menu_screen.dart                  |  8 +++
+ 8 files changed, 389 insertions(+)
+ create mode 100644 lib/screens/admin/admin_dashboard_screen.dart
+ create mode 100644 lib/screens/admin/analytics_panel_screen.dart
+ create mode 100644 lib/screens/admin/content_panel_screen.dart
+ create mode 100644 lib/screens/admin/plans_panel_screen.dart
+ create mode 100644 lib/screens/admin/promotions_panel_screen.dart
+ create mode 100644 lib/screens/admin/region_security_screen.dart
+ create mode 100644 lib/screens/admin/users_roles_screen.dart
+
+diff --git a/lib/screens/admin/admin_dashboard_screen.dart b/lib/screens/admin/admin_dashboard_screen.dart
+new file mode 100644
+index 0000000..97633d8
+--- /dev/null
++++ b/lib/screens/admin/admin_dashboard_screen.dart
+@@ -0,0 +1,46 @@
++import 'package:flutter/material.dart';
++import 'content_panel_screen.dart';
++import 'users_roles_screen.dart';
++import 'plans_panel_screen.dart';
++import 'promotions_panel_screen.dart';
++import 'analytics_panel_screen.dart';
++import 'region_security_screen.dart';
++
++/// Punto de entrada a los paneles de administrador (req. 52-66).
++class AdminDashboardScreen extends StatelessWidget {
++  const AdminDashboardScreen({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    final items = [
++      ('Contenido', Icons.movie_outlined, const ContentPanelScreen()),
++      ('Usuarios y roles', Icons.group_outlined, const UsersRolesScreen()),
++      ('Planes', Icons.card_membership_outlined, const PlansPanelScreen()),
++      ('Promociones', Icons.local_offer_outlined, const PromotionsPanelScreen()),
++      ('Analítica', Icons.bar_chart, const AnalyticsPanelScreen()),
++      ('Región y seguridad', Icons.security_outlined, const RegionSecurityScreen()),
++    ];
++
++    return Scaffold(
++      appBar: AppBar(title: const Text('Panel de administrador')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: items
++            .map(
++              (item) => Card(
++                child: ListTile(
++                  leading: Icon(item.$2),
++                  title: Text(item.$1),
++                  trailing: const Icon(Icons.chevron_right),
++                  onTap: () => Navigator.push(
++                    context,
++                    MaterialPageRoute(builder: (_) => item.$3),
++                  ),
++                ),
++              ),
++            )
++            .toList(),
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/admin/analytics_panel_screen.dart b/lib/screens/admin/analytics_panel_screen.dart
+new file mode 100644
+index 0000000..7fadd6e
+--- /dev/null
++++ b/lib/screens/admin/analytics_panel_screen.dart
+@@ -0,0 +1,57 @@
++import 'package:flutter/material.dart';
++
++/// Req. 63, 64: métricas de uso, ingresos y contenido popular.
++class AnalyticsPanelScreen extends StatelessWidget {
++  const AnalyticsPanelScreen({super.key});
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Métricas')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          _metricRow('Usuarios activos', '24.500'),
++          _metricRow('Reproducciones', '118.900'),
++          _metricRow('Ingresos del mes', '\$00.000.000'),
++          const SizedBox(height: 16),
++          Container(
++            height: 120,
++            alignment: Alignment.center,
++            decoration: BoxDecoration(
++              border: Border.all(color: Colors.grey.shade300),
++              borderRadius: BorderRadius.circular(8),
++            ),
++            child: const Column(
++              mainAxisSize: MainAxisSize.min,
++              children: [
++                Icon(Icons.bar_chart, size: 40, color: Colors.grey),
++                SizedBox(height: 4),
++                Text('Reproducciones por semana', style: TextStyle(fontSize: 12, color: Colors.grey)),
++              ],
++            ),
++          ),
++          const SizedBox(height: 16),
++          const Text('Contenido popular', style: TextStyle(fontWeight: FontWeight.bold)),
++          const ListTile(title: Text('Serie A'), trailing: Text('2400 vistas'), contentPadding: EdgeInsets.zero),
++          const ListTile(title: Text('Película B'), trailing: Text('1200 vistas'), contentPadding: EdgeInsets.zero),
++          const SizedBox(height: 16),
++          OutlinedButton(onPressed: () {}, child: const Text('Ver errores del sistema')),
++        ],
++      ),
++    );
++  }
++
++  Widget _metricRow(String label, String value) {
++    return Padding(
++      padding: const EdgeInsets.symmetric(vertical: 6),
++      child: Row(
++        mainAxisAlignment: MainAxisAlignment.spaceBetween,
++        children: [
++          Text(label, style: const TextStyle(color: Colors.grey)),
++          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/admin/content_panel_screen.dart b/lib/screens/admin/content_panel_screen.dart
+new file mode 100644
+index 0000000..7b1e730
+--- /dev/null
++++ b/lib/screens/admin/content_panel_screen.dart
+@@ -0,0 +1,65 @@
++import 'package:flutter/material.dart';
++
++/// Req. 52, 53: administración de contenido, temporadas y episodios.
++class ContentPanelScreen extends StatelessWidget {
++  const ContentPanelScreen({super.key});
++
++  static const items = [
++    {'nombre': 'Serie A', 'estado': 'Publicado', 'color': Colors.green},
++    {'nombre': 'Película B', 'estado': 'Revisión', 'color': Colors.orange},
++    {'nombre': 'Serie C', 'estado': 'Borrador', 'color': Colors.grey},
++  ];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Contenido'),
++        actions: [
++          TextButton(
++            onPressed: () {
++              // TODO: abrir formulario de carga de nuevo contenido.
++            },
++            child: const Text('+ Nuevo', style: TextStyle(color: Colors.white)),
++          ),
++        ],
++      ),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          ...items.map(
++            (c) => Card(
++              child: ListTile(
++                leading: Container(width: 40, height: 40, color: const Color(0xFFEEF0F4)),
++                title: Text(c['nombre'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
++                subtitle: Chip(
++                  label: Text(c['estado'] as String, style: TextStyle(color: c['color'] as Color)),
++                  visualDensity: VisualDensity.compact,
++                ),
++                trailing: Row(
++                  mainAxisSize: MainAxisSize.min,
++                  children: [
++                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () {}),
++                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () {}),
++                  ],
++                ),
++              ),
++            ),
++          ),
++          const Divider(height: 32),
++          const Text('Temporadas y episodios', style: TextStyle(fontWeight: FontWeight.bold)),
++          const SizedBox(height: 8),
++          OutlinedButton(onPressed: () {}, child: const Text('Panel de temporadas')),
++          const SizedBox(height: 8),
++          OutlinedButton(onPressed: () {}, child: const Text('Panel de episodios')),
++          const SizedBox(height: 8),
++          OutlinedButton(onPressed: () {}, child: const Text('Formulario de carga multimedia')),
++          const SizedBox(height: 16),
++          const Center(
++            child: Text('Estados: borrador · revisión · programado', style: TextStyle(fontSize: 11, color: Colors.grey)),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/admin/plans_panel_screen.dart b/lib/screens/admin/plans_panel_screen.dart
+new file mode 100644
+index 0000000..ec22829
+--- /dev/null
++++ b/lib/screens/admin/plans_panel_screen.dart
+@@ -0,0 +1,49 @@
++import 'package:flutter/material.dart';
++
++/// Req. 58: gestión administrativa de planes.
++class PlansPanelScreen extends StatelessWidget {
++  const PlansPanelScreen({super.key});
++
++  static const plans = [
++    {'nombre': 'Básico', 'precio': '\$00.000'},
++    {'nombre': 'Estándar', 'precio': '\$00.000'},
++    {'nombre': 'Premium', 'precio': '\$00.000'},
++  ];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Planes'),
++        actions: [
++          TextButton(onPressed: () {}, child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
++        ],
++      ),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          ...plans.map(
++            (p) => Card(
++              child: ListTile(
++                title: Text(p['nombre']!, style: const TextStyle(fontWeight: FontWeight.bold)),
++                subtitle: const Text('Límites: dispositivos, calidad y descargas'),
++                trailing: Row(
++                  mainAxisSize: MainAxisSize.min,
++                  children: [
++                    Text('${p['precio']}/mes'),
++                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () {}),
++                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () {}),
++                  ],
++                ),
++              ),
++            ),
++          ),
++          const SizedBox(height: 16),
++          const Center(
++            child: Text('Los cambios aplican a nuevas suscripciones', style: TextStyle(fontSize: 11, color: Colors.grey)),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/admin/promotions_panel_screen.dart b/lib/screens/admin/promotions_panel_screen.dart
+new file mode 100644
+index 0000000..ce97302
+--- /dev/null
++++ b/lib/screens/admin/promotions_panel_screen.dart
+@@ -0,0 +1,50 @@
++import 'package:flutter/material.dart';
++
++/// Req. 59, 62: gestión de códigos promocionales.
++class PromotionsPanelScreen extends StatefulWidget {
++  const PromotionsPanelScreen({super.key});
++
++  @override
++  State<PromotionsPanelScreen> createState() => _PromotionsPanelScreenState();
++}
++
++class _PromotionsPanelScreenState extends State<PromotionsPanelScreen> {
++  final List<Map<String, Object>> _promos = [
++    {'codigo': 'BIENVENIDA20', 'detalle': '20% · 1 mes', 'activo': true},
++    {'codigo': 'VERANO2026', 'detalle': '10% · campaña', 'activo': true},
++    {'codigo': 'EXPIRADA10', 'detalle': '10% · vencido', 'activo': false},
++  ];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(
++        title: const Text('Promociones'),
++        actions: [
++          TextButton(onPressed: () {}, child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
++        ],
++      ),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          ..._promos.asMap().entries.map(
++                (e) => Card(
++                  child: SwitchListTile(
++                    title: Text(e.value['codigo'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
++                    subtitle: Text(e.value['detalle'] as String),
++                    value: e.value['activo'] as bool,
++                    onChanged: (v) => setState(() => _promos[e.key]['activo'] = v),
++                  ),
++                ),
++              ),
++          const Divider(height: 32),
++          OutlinedButton(onPressed: () {}, child: const Text('Configurar código nuevo')),
++          const SizedBox(height: 16),
++          const Center(
++            child: Text('Los códigos vencidos no se pueden aplicar', style: TextStyle(fontSize: 11, color: Colors.grey)),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/admin/region_security_screen.dart b/lib/screens/admin/region_security_screen.dart
+new file mode 100644
+index 0000000..928fe70
+--- /dev/null
++++ b/lib/screens/admin/region_security_screen.dart
+@@ -0,0 +1,55 @@
++import 'package:flutter/material.dart';
++
++/// Req. 56, 61, 66: disponibilidad por región, dispositivos y alertas de seguridad.
++class RegionSecurityScreen extends StatefulWidget {
++  const RegionSecurityScreen({super.key});
++
++  @override
++  State<RegionSecurityScreen> createState() => _RegionSecurityScreenState();
++}
++
++class _RegionSecurityScreenState extends State<RegionSecurityScreen> {
++  final Map<String, bool> _regions = {'Colombia': true, 'México': true, 'España': false};
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Región y seguridad')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          const Text('Disponibilidad por territorio', style: TextStyle(fontWeight: FontWeight.bold)),
++          ..._regions.keys.map(
++            (r) => SwitchListTile(
++              title: Text(r),
++              value: _regions[r]!,
++              onChanged: (v) => setState(() => _regions[r] = v),
++              contentPadding: EdgeInsets.zero,
++            ),
++          ),
++          const Divider(height: 32),
++          const Text('Dispositivos autorizados', style: TextStyle(fontWeight: FontWeight.bold)),
++          const SizedBox(height: 4),
++          const Text('Límite por plan: 4 dispositivos', style: TextStyle(color: Colors.grey)),
++          const SizedBox(height: 8),
++          OutlinedButton(onPressed: () {}, child: const Text('Pantalla Dispositivos')),
++          const Divider(height: 32),
++          Card(
++            color: const Color(0xFFFFF7E8),
++            shape: RoundedRectangleBorder(
++              side: const BorderSide(color: Colors.orange),
++              borderRadius: BorderRadius.circular(8),
++            ),
++            child: const ListTile(
++              leading: Icon(Icons.flag_outlined, color: Colors.orange),
++              title: Text('Actividad inusual detectada', style: TextStyle(fontWeight: FontWeight.bold)),
++              subtitle: Text('3 accesos desde ubicaciones distintas en 1 hora.'),
++            ),
++          ),
++          const SizedBox(height: 8),
++          OutlinedButton(onPressed: () {}, child: const Text('Ver alertas de seguridad')),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/admin/users_roles_screen.dart b/lib/screens/admin/users_roles_screen.dart
+new file mode 100644
+index 0000000..5b0dd6c
+--- /dev/null
++++ b/lib/screens/admin/users_roles_screen.dart
+@@ -0,0 +1,59 @@
++import 'package:flutter/material.dart';
++
++/// Req. 54, 55: gestión de usuarios, roles y auditoría.
++class UsersRolesScreen extends StatelessWidget {
++  const UsersRolesScreen({super.key});
++
++  static const users = [
++    {'nombre': 'Ana Torres', 'correo': 'ana@mail.com', 'estado': 'Activo', 'activo': true},
++    {'nombre': 'Luis Vera', 'correo': 'luis@mail.com', 'estado': 'Bloqueado', 'activo': false},
++  ];
++
++  static const roles = ['Administrador', 'Editor de contenido', 'Soporte'];
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Usuarios')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          TextField(
++            decoration: InputDecoration(
++              prefixIcon: const Icon(Icons.search),
++              hintText: 'Buscar usuario',
++              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
++            ),
++          ),
++          const SizedBox(height: 12),
++          ...users.map(
++            (u) => ListTile(
++              leading: const CircleAvatar(child: Icon(Icons.person)),
++              title: Text(u['nombre'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
++              subtitle: Text(u['correo'] as String),
++              trailing: Chip(
++                label: Text(u['estado'] as String),
++                backgroundColor:
++                    (u['activo'] as bool) ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
++                labelStyle: TextStyle(color: (u['activo'] as bool) ? Colors.green : Colors.red),
++              ),
++            ),
++          ),
++          const Divider(height: 32),
++          const Text('Roles y permisos', style: TextStyle(fontWeight: FontWeight.bold)),
++          ...roles.map(
++            (r) => ListTile(
++              title: Text(r),
++              trailing: TextButton(onPressed: () {}, child: const Text('Editar')),
++              contentPadding: EdgeInsets.zero,
++            ),
++          ),
++          const SizedBox(height: 8),
++          OutlinedButton(onPressed: () {}, child: const Text('+ Crear rol')),
++          const SizedBox(height: 24),
++          OutlinedButton(onPressed: () {}, child: const Text('Registro de auditoría')),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/menu_screen.dart b/lib/screens/menu_screen.dart
+index 992fd97..b82fb12 100644
+--- a/lib/screens/menu_screen.dart
++++ b/lib/screens/menu_screen.dart
+@@ -1,6 +1,7 @@
+ import 'package:flutter/material.dart';
+ import 'catalog/profiles_screen.dart';
+ import 'catalog/parental_control_screen.dart';
++import 'admin/admin_dashboard_screen.dart';
+ 
+ /// Req. 18, 38: categorías y tipos de contenido.
+ class MenuScreen extends StatelessWidget {
+@@ -51,6 +52,13 @@ class MenuScreen extends StatelessWidget {
+             onTap: () =>
+                 Navigator.push(context, MaterialPageRoute(builder: (_) => const ParentalControlScreen())),
+           ),
++          ListTile(
++            leading: const Icon(Icons.admin_panel_settings_outlined),
++            title: const Text('Panel de administrador'),
++            trailing: const Icon(Icons.chevron_right),
++            onTap: () =>
++                Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminDashboardScreen())),
++          ),
+         ],
+       ),
+     );
+-- 
+2.43.0
+

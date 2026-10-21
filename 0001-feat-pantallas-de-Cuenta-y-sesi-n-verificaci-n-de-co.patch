@@ -1,0 +1,397 @@
+From 2b82f3596b5f77f0c3a00278a28edbf3c8a769ea Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Tue, 13 Oct 2026 20:56:10 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20pantallas=20de=20Cuenta=20y=20sesi?=
+ =?UTF-8?q?=C3=B3n=20(verificaci=C3=B3n=20de=20correo,=20seguridad/2FA,=20?=
+ =?UTF-8?q?dispositivos)=20y=20las=20conecta=20a=20la=20navegaci=C3=B3n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/account/devices_screen.dart       | 88 ++++++++++++++++++
+ lib/screens/account/security_screen.dart      | 62 +++++++++++++
+ .../auth/email_verification_screen.dart       | 93 +++++++++++++++++++
+ lib/screens/auth/register_screen.dart         | 60 +++++++++---
+ lib/screens/payments/subscription_screen.dart | 13 +++
+ 5 files changed, 305 insertions(+), 11 deletions(-)
+ create mode 100644 lib/screens/account/devices_screen.dart
+ create mode 100644 lib/screens/account/security_screen.dart
+ create mode 100644 lib/screens/auth/email_verification_screen.dart
+
+diff --git a/lib/screens/account/devices_screen.dart b/lib/screens/account/devices_screen.dart
+new file mode 100644
+index 0000000..b32389f
+--- /dev/null
++++ b/lib/screens/account/devices_screen.dart
+@@ -0,0 +1,88 @@
++import 'package:flutter/material.dart';
++
++/// Req. 8: dispositivos con sesión activa.
++class DevicesScreen extends StatefulWidget {
++  const DevicesScreen({super.key});
++
++  @override
++  State<DevicesScreen> createState() => _DevicesScreenState();
++}
++
++class _DevicesScreenState extends State<DevicesScreen> {
++  final List<Map<String, Object>> _devices = [
++    {'nombre': 'iPhone 14', 'detalle': 'Bogotá · ahora', 'actual': true, 'icono': Icons.phone_iphone},
++    {'nombre': 'Chrome · Windows', 'detalle': 'Medellín · hace 2 h', 'actual': false, 'icono': Icons.laptop_mac},
++    {'nombre': 'Smart TV Samsung', 'detalle': 'Cali · hace 1 día', 'actual': false, 'icono': Icons.tv},
++  ];
++
++  void _closeSession(int index) {
++    setState(() => _devices.removeAt(index));
++    ScaffoldMessenger.of(context).showSnackBar(
++      const SnackBar(content: Text('Sesión cerrada en ese dispositivo')),
++    );
++  }
++
++  Future<void> _closeAll() async {
++    final confirmed = await showDialog<bool>(
++      context: context,
++      builder: (_) => AlertDialog(
++        title: const Text('¿Cerrar todas las sesiones?'),
++        content: const Text('Tendrás que volver a iniciar sesión en todos tus dispositivos, incluido este.'),
++        actions: [
++          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
++          TextButton(
++            onPressed: () => Navigator.pop(context, true),
++            child: const Text('Cerrar todas', style: TextStyle(color: Colors.red)),
++          ),
++        ],
++      ),
++    );
++    if (confirmed == true) {
++      setState(() => _devices.removeWhere((d) => d['actual'] != true));
++    }
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Dispositivos')),
++      body: Column(
++        children: [
++          Expanded(
++            child: ListView.builder(
++              padding: const EdgeInsets.all(16),
++              itemCount: _devices.length,
++              itemBuilder: (_, i) {
++                final d = _devices[i];
++                return Card(
++                  child: ListTile(
++                    leading: Icon(d['icono'] as IconData),
++                    title: Text(d['nombre'] as String),
++                    subtitle: Text(d['detalle'] as String),
++                    trailing: d['actual'] == true
++                        ? const Chip(label: Text('Esta sesión'))
++                        : TextButton(
++                            onPressed: () => _closeSession(i),
++                            style: TextButton.styleFrom(foregroundColor: Colors.red),
++                            child: const Text('Cerrar sesión'),
++                          ),
++                  ),
++                );
++              },
++            ),
++          ),
++          Padding(
++            padding: const EdgeInsets.all(16),
++            child: SizedBox(
++              width: double.infinity,
++              child: ElevatedButton(
++                onPressed: _closeAll,
++                child: const Text('CERRAR TODAS LAS SESIONES'),
++              ),
++            ),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/account/security_screen.dart b/lib/screens/account/security_screen.dart
+new file mode 100644
+index 0000000..5ca7189
+--- /dev/null
++++ b/lib/screens/account/security_screen.dart
+@@ -0,0 +1,62 @@
++import 'package:flutter/material.dart';
++
++/// Req. 7: doble autenticación (2FA) y cambio de contraseña.
++class SecurityScreen extends StatefulWidget {
++  const SecurityScreen({super.key});
++
++  @override
++  State<SecurityScreen> createState() => _SecurityScreenState();
++}
++
++class _SecurityScreenState extends State<SecurityScreen> {
++  bool _twoFactorEnabled = true;
++  String _method = 'app';
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      appBar: AppBar(title: const Text('Seguridad')),
++      body: ListView(
++        padding: const EdgeInsets.all(16),
++        children: [
++          Card(
++            child: SwitchListTile(
++              secondary: const Icon(Icons.shield_outlined),
++              value: _twoFactorEnabled,
++              onChanged: (v) => setState(() => _twoFactorEnabled = v),
++              title: const Text('Doble autenticación'),
++              subtitle: const Text('Verificación adicional al iniciar sesión'),
++            ),
++          ),
++          const SizedBox(height: 8),
++          const Text('Método', style: TextStyle(fontWeight: FontWeight.bold)),
++          RadioListTile(
++            value: 'app',
++            groupValue: _method,
++            onChanged: _twoFactorEnabled ? (v) => setState(() => _method = v as String) : null,
++            title: const Text('App autenticadora'),
++          ),
++          RadioListTile(
++            value: 'sms',
++            groupValue: _method,
++            onChanged: _twoFactorEnabled ? (v) => setState(() => _method = v as String) : null,
++            title: const Text('SMS al número guardado'),
++          ),
++          const Divider(),
++          const Text('Contraseña', style: TextStyle(fontWeight: FontWeight.bold)),
++          const SizedBox(height: 8),
++          OutlinedButton(
++            onPressed: () {
++              // TODO: abrir formulario de cambio de contraseña.
++            },
++            child: const Text('Cambiar contraseña'),
++          ),
++          const SizedBox(height: 24),
++          const Center(
++            child: Text('Recomendamos activar 2FA', style: TextStyle(fontSize: 12, color: Colors.grey)),
++          ),
++        ],
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/auth/email_verification_screen.dart b/lib/screens/auth/email_verification_screen.dart
+new file mode 100644
+index 0000000..bbd31b0
+--- /dev/null
++++ b/lib/screens/auth/email_verification_screen.dart
+@@ -0,0 +1,93 @@
++import 'package:flutter/material.dart';
++import '../../widgets/primary_button.dart';
++import '../home_screen.dart';
++
++/// Req. 6: verificación de correo con código de 6 dígitos.
++class EmailVerificationScreen extends StatefulWidget {
++  final String email;
++  const EmailVerificationScreen({super.key, required this.email});
++
++  @override
++  State<EmailVerificationScreen> createState() => _EmailVerificationScreenState();
++}
++
++class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
++  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
++
++  String get _code => _controllers.map((c) => c.text).join();
++
++  @override
++  void dispose() {
++    for (final c in _controllers) {
++      c.dispose();
++    }
++    super.dispose();
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return Scaffold(
++      body: SafeArea(
++        child: Padding(
++          padding: const EdgeInsets.all(24),
++          child: Column(
++            children: [
++              const SizedBox(height: 32),
++              const Icon(Icons.mark_email_unread_outlined, size: 48),
++              const SizedBox(height: 16),
++              const Text('Verifica tu correo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
++              const SizedBox(height: 8),
++              Text('Enviamos un código a ${widget.email}', textAlign: TextAlign.center),
++              const SizedBox(height: 24),
++              Row(
++                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
++                children: List.generate(
++                  6,
++                  (i) => SizedBox(
++                    width: 42,
++                    child: TextField(
++                      controller: _controllers[i],
++                      textAlign: TextAlign.center,
++                      keyboardType: TextInputType.number,
++                      maxLength: 1,
++                      decoration: const InputDecoration(counterText: ''),
++                      onChanged: (v) {
++                        if (v.isNotEmpty && i < 5) {
++                          FocusScope.of(context).nextFocus();
++                        }
++                      },
++                    ),
++                  ),
++                ),
++              ),
++              const SizedBox(height: 8),
++              const Text('El código expira en 04:59', style: TextStyle(fontSize: 12, color: Colors.grey)),
++              const SizedBox(height: 24),
++              PrimaryButton(
++                label: 'VERIFICAR',
++                onPressed: () {
++                  // TODO: validar _code contra el backend.
++                  Navigator.pushAndRemoveUntil(
++                    context,
++                    MaterialPageRoute(builder: (_) => const HomeScreen()),
++                    (route) => false,
++                  );
++                },
++              ),
++              const SizedBox(height: 16),
++              TextButton(
++                onPressed: () {
++                  // TODO: reenviar código.
++                  ScaffoldMessenger.of(context).showSnackBar(
++                    const SnackBar(content: Text('Código reenviado')),
++                  );
++                },
++                child: const Text('¿No llegó el código? Reenviar código'),
++              ),
++            ],
++          ),
++        ),
++      ),
++    );
++  }
++}
+diff --git a/lib/screens/auth/register_screen.dart b/lib/screens/auth/register_screen.dart
+index 448cb37..62c13e8 100644
+--- a/lib/screens/auth/register_screen.dart
++++ b/lib/screens/auth/register_screen.dart
+@@ -1,10 +1,25 @@
+ import 'package:flutter/material.dart';
+ import '../../widgets/primary_button.dart';
++import 'email_verification_screen.dart';
+ 
+ /// Req. 1: registro de usuario.
+-class RegisterScreen extends StatelessWidget {
++class RegisterScreen extends StatefulWidget {
+   const RegisterScreen({super.key});
+ 
++  @override
++  State<RegisterScreen> createState() => _RegisterScreenState();
++}
++
++class _RegisterScreenState extends State<RegisterScreen> {
++  final _emailController = TextEditingController();
++  bool _acceptedTerms = false;
++
++  @override
++  void dispose() {
++    _emailController.dispose();
++    super.dispose();
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+@@ -13,16 +28,39 @@ class RegisterScreen extends StatelessWidget {
+         padding: const EdgeInsets.all(24),
+         child: Column(
+           crossAxisAlignment: CrossAxisAlignment.stretch,
+-          children: const [
+-            TextField(decoration: InputDecoration(labelText: 'Nombre completo')),
+-            SizedBox(height: 12),
+-            TextField(decoration: InputDecoration(labelText: 'Correo electrónico')),
+-            SizedBox(height: 12),
+-            TextField(decoration: InputDecoration(labelText: 'Contraseña'), obscureText: true),
+-            SizedBox(height: 12),
+-            TextField(decoration: InputDecoration(labelText: 'Confirmar contraseña'), obscureText: true),
+-            SizedBox(height: 16),
+-            PrimaryButton(label: 'REGISTRARME'),
++          children: [
++            const TextField(decoration: InputDecoration(labelText: 'Nombre completo')),
++            const SizedBox(height: 12),
++            TextField(
++              controller: _emailController,
++              decoration: const InputDecoration(labelText: 'Correo electrónico'),
++              keyboardType: TextInputType.emailAddress,
++            ),
++            const SizedBox(height: 12),
++            const TextField(decoration: InputDecoration(labelText: 'Contraseña'), obscureText: true),
++            const SizedBox(height: 12),
++            const TextField(decoration: InputDecoration(labelText: 'Confirmar contraseña'), obscureText: true),
++            CheckboxListTile(
++              value: _acceptedTerms,
++              onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
++              title: const Text('Autorizo el tratamiento de mis datos personales'),
++              controlAffinity: ListTileControlAffinity.leading,
++              contentPadding: EdgeInsets.zero,
++            ),
++            const SizedBox(height: 16),
++            PrimaryButton(
++              label: 'REGISTRARME',
++              onPressed: _acceptedTerms
++                  ? () {
++                      // TODO: enviar el registro al backend.
++                      final email = _emailController.text.isEmpty ? 'correo@ejemplo.com' : _emailController.text;
++                      Navigator.push(
++                        context,
++                        MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: email)),
++                      );
++                    }
++                  : null,
++            ),
+           ],
+         ),
+       ),
+diff --git a/lib/screens/payments/subscription_screen.dart b/lib/screens/payments/subscription_screen.dart
+index acd48ff..1dbb9ad 100644
+--- a/lib/screens/payments/subscription_screen.dart
++++ b/lib/screens/payments/subscription_screen.dart
+@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
+ import 'billing_screen.dart';
+ import 'payment_methods_screen.dart';
+ import 'plans_screen.dart';
++import '../account/security_screen.dart';
++import '../account/devices_screen.dart';
+ 
+ /// Req. 14, 15, 16: estado de la suscripción, cambio y cancelación de plan.
+ class SubscriptionScreen extends StatefulWidget {
+@@ -83,6 +85,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
+             trailing: const Icon(Icons.chevron_right),
+             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BillingScreen())),
+           ),
++          const Divider(),
++          ListTile(
++            title: const Text('Seguridad'),
++            trailing: const Icon(Icons.chevron_right),
++            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SecurityScreen())),
++          ),
++          ListTile(
++            title: const Text('Dispositivos'),
++            trailing: const Icon(Icons.chevron_right),
++            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DevicesScreen())),
++          ),
+         ],
+       ),
+     );
+-- 
+2.43.0
+

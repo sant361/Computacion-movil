@@ -1,0 +1,35 @@
+From 2fcdddf84fc37e940186ecfb8446d8a9d6e39aa5 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Fri, 16 Oct 2026 19:49:20 +0000
+Subject: [PATCH] fix: corrige overflow en las tarjetas de Inicio (Sugerencias,
+ Seguir viendo, Para ti)
+
+---
+ lib/screens/home_screen.dart | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart
+index b75c113..fbe4bb0 100644
+--- a/lib/screens/home_screen.dart
++++ b/lib/screens/home_screen.dart
+@@ -27,7 +27,7 @@ class HomeScreen extends StatelessWidget {
+         Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+         const SizedBox(height: 8),
+         SizedBox(
+-          height: showProgress ? 100 : 90,
++          height: showProgress ? 122 : 106,
+           child: ListView.separated(
+             scrollDirection: Axis.horizontal,
+             itemCount: items.length,
+@@ -45,7 +45,7 @@ class HomeScreen extends StatelessWidget {
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Container(
+-                        height: 60,
++                        height: 56,
+                         decoration: BoxDecoration(
+                           color: const Color(0xFFEEF0F4),
+                           borderRadius: BorderRadius.circular(8),
+-- 
+2.43.0
+

@@ -1,0 +1,108 @@
+From 008ea812aa448c796f633d9ab721088c05b82302 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Wed, 14 Oct 2026 22:27:31 +0000
+Subject: [PATCH 2/4] =?UTF-8?q?feat:=20conecta=20los=20selectores=20de=20s?=
+ =?UTF-8?q?ubt=C3=ADtulos,=20idioma=20de=20audio=20y=20calidad=20en=20el?=
+ =?UTF-8?q?=20reproductor?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/player_screen.dart | 66 +++++++++++++++++++++++++++++++---
+ 1 file changed, 62 insertions(+), 4 deletions(-)
+
+diff --git a/lib/screens/player_screen.dart b/lib/screens/player_screen.dart
+index f88dd01..688b514 100644
+--- a/lib/screens/player_screen.dart
++++ b/lib/screens/player_screen.dart
+@@ -23,6 +23,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
+   bool _watchFromStart = true;
+   bool _inMyList = false;
+   bool? _liked;
++  String _subtitles = 'Desactivados';
++  String _audioLang = 'Español';
++  String _quality = 'Auto';
+ 
+   @override
+   void initState() {
+@@ -56,6 +59,37 @@ class _PlayerScreenState extends State<PlayerScreen> {
+     setState(() => _controller.setVolume(_controller.value.volume == 0 ? 1 : 0));
+   }
+ 
++  Future<void> _pickOption({
++    required String title,
++    required List<String> options,
++    required String current,
++    required ValueChanged<String> onSelected,
++  }) async {
++    final choice = await showModalBottomSheet<String>(
++      context: context,
++      builder: (_) => SafeArea(
++        child: Column(
++          mainAxisSize: MainAxisSize.min,
++          children: [
++            Padding(
++              padding: const EdgeInsets.all(16),
++              child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
++            ),
++            ...options.map(
++              (o) => RadioListTile(
++                value: o,
++                groupValue: current,
++                title: Text(o),
++                onChanged: (v) => Navigator.pop(context, v),
++              ),
++            ),
++          ],
++        ),
++      ),
++    );
++    if (choice != null) onSelected(choice);
++  }
++
+   String _formatDuration(Duration d) {
+     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+@@ -141,10 +175,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
+           ),
+           Wrap(
+             spacing: 8,
+-            children: const [
+-              Chip(label: Text('CC')), // subtítulos — req. 29
+-              Chip(label: Text('Audio')), // idioma de audio — req. 30
+-              Chip(label: Text('Calidad')), // calidad de video — req. 26
++            children: [
++              ActionChip(
++                label: Text('CC: $_subtitles'), // req. 29 subtítulos
++                onPressed: () => _pickOption(
++                  title: 'Subtítulos',
++                  options: const ['Desactivados', 'Español', 'Inglés', 'Portugués'],
++                  current: _subtitles,
++                  onSelected: (v) => setState(() => _subtitles = v),
++                ),
++              ),
++              ActionChip(
++                label: Text('Audio: $_audioLang'), // req. 30 idioma de audio
++                onPressed: () => _pickOption(
++                  title: 'Idioma de audio',
++                  options: const ['Español', 'Inglés', 'Portugués'],
++                  current: _audioLang,
++                  onSelected: (v) => setState(() => _audioLang = v),
++                ),
++              ),
++              ActionChip(
++                label: Text('Calidad: $_quality'), // req. 26 calidad de video
++                onPressed: () => _pickOption(
++                  title: 'Calidad de video',
++                  options: const ['Auto', '480p', '720p', '1080p'],
++                  current: _quality,
++                  onSelected: (v) => setState(() => _quality = v),
++                ),
++              ),
+             ],
+           ),
+           SwitchListTile(
+-- 
+2.43.0
+

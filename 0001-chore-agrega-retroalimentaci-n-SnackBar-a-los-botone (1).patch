@@ -1,0 +1,178 @@
+From 7558bf770c5310a2d3fd83b67baff1f3895a53c9 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Wed, 14 Oct 2026 02:28:24 +0000
+Subject: [PATCH] =?UTF-8?q?chore:=20agrega=20retroalimentaci=C3=B3n=20(Sna?=
+ =?UTF-8?q?ckBar)=20a=20los=20botones=20de=20los=20paneles=20de=20administ?=
+ =?UTF-8?q?rador=20que=20quedaban=20sin=20acci=C3=B3n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/admin/analytics_panel_screen.dart  |  2 +-
+ lib/screens/admin/content_panel_screen.dart    | 10 +++++-----
+ lib/screens/admin/plans_panel_screen.dart      |  6 +++---
+ lib/screens/admin/promotions_panel_screen.dart |  4 ++--
+ lib/screens/admin/region_security_screen.dart  |  4 ++--
+ lib/screens/admin/users_roles_screen.dart      |  6 +++---
+ lib/screens/player_screen.dart                 |  4 +++-
+ 7 files changed, 19 insertions(+), 17 deletions(-)
+
+diff --git a/lib/screens/admin/analytics_panel_screen.dart b/lib/screens/admin/analytics_panel_screen.dart
+index 7fadd6e..5b0ab14 100644
+--- a/lib/screens/admin/analytics_panel_screen.dart
++++ b/lib/screens/admin/analytics_panel_screen.dart
+@@ -36,7 +36,7 @@ class AnalyticsPanelScreen extends StatelessWidget {
+           const ListTile(title: Text('Serie A'), trailing: Text('2400 vistas'), contentPadding: EdgeInsets.zero),
+           const ListTile(title: Text('Película B'), trailing: Text('1200 vistas'), contentPadding: EdgeInsets.zero),
+           const SizedBox(height: 16),
+-          OutlinedButton(onPressed: () {}, child: const Text('Ver errores del sistema')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo registro de errores (demo)'))), child: const Text('Ver errores del sistema')),
+         ],
+       ),
+     );
+diff --git a/lib/screens/admin/content_panel_screen.dart b/lib/screens/admin/content_panel_screen.dart
+index 7b1e730..8ccef91 100644
+--- a/lib/screens/admin/content_panel_screen.dart
++++ b/lib/screens/admin/content_panel_screen.dart
+@@ -39,8 +39,8 @@ class ContentPanelScreen extends StatelessWidget {
+                 trailing: Row(
+                   mainAxisSize: MainAxisSize.min,
+                   children: [
+-                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () {}),
+-                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () {}),
++                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editar contenido (demo)')))),
++                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contenido eliminado (demo)')))),
+                   ],
+                 ),
+               ),
+@@ -49,11 +49,11 @@ class ContentPanelScreen extends StatelessWidget {
+           const Divider(height: 32),
+           const Text('Temporadas y episodios', style: TextStyle(fontWeight: FontWeight.bold)),
+           const SizedBox(height: 8),
+-          OutlinedButton(onPressed: () {}, child: const Text('Panel de temporadas')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo panel de temporadas (demo)'))), child: const Text('Panel de temporadas')),
+           const SizedBox(height: 8),
+-          OutlinedButton(onPressed: () {}, child: const Text('Panel de episodios')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo panel de episodios (demo)'))), child: const Text('Panel de episodios')),
+           const SizedBox(height: 8),
+-          OutlinedButton(onPressed: () {}, child: const Text('Formulario de carga multimedia')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo formulario de carga (demo)'))), child: const Text('Formulario de carga multimedia')),
+           const SizedBox(height: 16),
+           const Center(
+             child: Text('Estados: borrador · revisión · programado', style: TextStyle(fontSize: 11, color: Colors.grey)),
+diff --git a/lib/screens/admin/plans_panel_screen.dart b/lib/screens/admin/plans_panel_screen.dart
+index ec22829..a06fb73 100644
+--- a/lib/screens/admin/plans_panel_screen.dart
++++ b/lib/screens/admin/plans_panel_screen.dart
+@@ -16,7 +16,7 @@ class PlansPanelScreen extends StatelessWidget {
+       appBar: AppBar(
+         title: const Text('Planes'),
+         actions: [
+-          TextButton(onPressed: () {}, child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
++          TextButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de nuevo plan (demo)'))), child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
+         ],
+       ),
+       body: ListView(
+@@ -31,8 +31,8 @@ class PlansPanelScreen extends StatelessWidget {
+                   mainAxisSize: MainAxisSize.min,
+                   children: [
+                     Text('${p['precio']}/mes'),
+-                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () {}),
+-                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () {}),
++                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editar plan (demo)')))),
++                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Plan eliminado (demo)')))),
+                   ],
+                 ),
+               ),
+diff --git a/lib/screens/admin/promotions_panel_screen.dart b/lib/screens/admin/promotions_panel_screen.dart
+index ce97302..dc52d76 100644
+--- a/lib/screens/admin/promotions_panel_screen.dart
++++ b/lib/screens/admin/promotions_panel_screen.dart
+@@ -21,7 +21,7 @@ class _PromotionsPanelScreenState extends State<PromotionsPanelScreen> {
+       appBar: AppBar(
+         title: const Text('Promociones'),
+         actions: [
+-          TextButton(onPressed: () {}, child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
++          TextButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de nueva promoción (demo)'))), child: const Text('+ Nuevo', style: TextStyle(color: Colors.white))),
+         ],
+       ),
+       body: ListView(
+@@ -38,7 +38,7 @@ class _PromotionsPanelScreenState extends State<PromotionsPanelScreen> {
+                 ),
+               ),
+           const Divider(height: 32),
+-          OutlinedButton(onPressed: () {}, child: const Text('Configurar código nuevo')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de código nuevo (demo)'))), child: const Text('Configurar código nuevo')),
+           const SizedBox(height: 16),
+           const Center(
+             child: Text('Los códigos vencidos no se pueden aplicar', style: TextStyle(fontSize: 11, color: Colors.grey)),
+diff --git a/lib/screens/admin/region_security_screen.dart b/lib/screens/admin/region_security_screen.dart
+index 928fe70..4833c4e 100644
+--- a/lib/screens/admin/region_security_screen.dart
++++ b/lib/screens/admin/region_security_screen.dart
+@@ -32,7 +32,7 @@ class _RegionSecurityScreenState extends State<RegionSecurityScreen> {
+           const SizedBox(height: 4),
+           const Text('Límite por plan: 4 dispositivos', style: TextStyle(color: Colors.grey)),
+           const SizedBox(height: 8),
+-          OutlinedButton(onPressed: () {}, child: const Text('Pantalla Dispositivos')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo dispositivos autorizados (demo)'))), child: const Text('Pantalla Dispositivos')),
+           const Divider(height: 32),
+           Card(
+             color: const Color(0xFFFFF7E8),
+@@ -47,7 +47,7 @@ class _RegionSecurityScreenState extends State<RegionSecurityScreen> {
+             ),
+           ),
+           const SizedBox(height: 8),
+-          OutlinedButton(onPressed: () {}, child: const Text('Ver alertas de seguridad')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo alertas de seguridad (demo)'))), child: const Text('Ver alertas de seguridad')),
+         ],
+       ),
+     );
+diff --git a/lib/screens/admin/users_roles_screen.dart b/lib/screens/admin/users_roles_screen.dart
+index 5b0dd6c..e4e09f2 100644
+--- a/lib/screens/admin/users_roles_screen.dart
++++ b/lib/screens/admin/users_roles_screen.dart
+@@ -44,14 +44,14 @@ class UsersRolesScreen extends StatelessWidget {
+           ...roles.map(
+             (r) => ListTile(
+               title: Text(r),
+-              trailing: TextButton(onPressed: () {}, child: const Text('Editar')),
++              trailing: TextButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editar permisos del rol (demo)'))), child: const Text('Editar')),
+               contentPadding: EdgeInsets.zero,
+             ),
+           ),
+           const SizedBox(height: 8),
+-          OutlinedButton(onPressed: () {}, child: const Text('+ Crear rol')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de nuevo rol (demo)'))), child: const Text('+ Crear rol')),
+           const SizedBox(height: 24),
+-          OutlinedButton(onPressed: () {}, child: const Text('Registro de auditoría')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo registro de auditoría (demo)'))), child: const Text('Registro de auditoría')),
+         ],
+       ),
+     );
+diff --git a/lib/screens/player_screen.dart b/lib/screens/player_screen.dart
+index bcf0ebf..7d8c796 100644
+--- a/lib/screens/player_screen.dart
++++ b/lib/screens/player_screen.dart
+@@ -30,6 +30,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
+           ),
+           const SizedBox(height: 8),
+           const LinearProgressIndicator(value: 0.3),
++          // TODO: estos controles son visuales; falta integrar un paquete real de
++          // video (por ejemplo video_player o chewie) para que reproduzcan el contenido.
+           Row(
+             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+             children: [
+@@ -53,7 +55,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
+             onChanged: (v) => setState(() => _autoplay = v),
+             title: const Text('Autoplay'), // req. 27
+           ),
+-          OutlinedButton(onPressed: () {}, child: const Text('Siguiente episodio ▶')),
++          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reproduciendo siguiente episodio (demo)'))), child: const Text('Siguiente episodio ▶')),
+           const SizedBox(height: 16),
+           const Text('Serie · Temporada 1', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+           const SizedBox(height: 8),
+-- 
+2.43.0
+

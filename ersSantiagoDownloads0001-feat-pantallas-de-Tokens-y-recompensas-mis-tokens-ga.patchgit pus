@@ -1,0 +1,11 @@
+[33mf9ed5b7[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m feat: pantallas de Catálogo y contenido (ficha, perfiles, control parental, notificaciones, descargas) y las conecta a la navegación
+[33md65aa7d[m feat: pantallas de Cuenta y sesión (verificación de correo, seguridad/2FA, dispositivos) y las conecta a la navegación
+[33mc67e286[m feat: conecta botones sueltos (agregar/eliminar método de pago, cancelar plan, mi lista, compartir, calificación)
+[33m714c4f7[m feat: conecta la navegación entre Login, Inicio, Reproductor, Búsqueda y Suscripción
+[33m48591d4[m chore: deja LoginScreen como pantalla inicial de la app
+[33mb2927d3[m feat: flujo de pagos (planes, pago, resultado, métodos, suscripción, facturación)
+[33m52ef940[m feat: pantalla del reproductor (Serie) con controles y configuración
+[33ma4aa105[m feat: pantallas de Inicio, Menú y Búsqueda
+[33m64fa4bc[m feat: pantallas de autenticación (login, registro, recuperar contraseña)
+[33me508ab3[m chore: agrega main.dart y widget PrimaryButton reutilizable
+[33m84612d8[m chore: inicializa el proyecto Flutter

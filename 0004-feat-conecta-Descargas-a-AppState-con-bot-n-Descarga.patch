@@ -1,0 +1,259 @@
+From 6132ce21e2089fe7a5946388f5bc98a33158b558 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Thu, 15 Oct 2026 19:29:24 +0000
+Subject: [PATCH 4/4] =?UTF-8?q?feat:=20conecta=20Descargas=20a=20AppState,?=
+ =?UTF-8?q?=20con=20bot=C3=B3n=20Descargar=20real=20en=20la=20Ficha=20de?=
+ =?UTF-8?q?=20contenido?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/catalog/downloads_screen.dart | 99 +++++++++--------------
+ lib/screens/content_detail_screen.dart    | 49 +++++++----
+ lib/state/app_state.dart                  | 26 ++++++
+ 3 files changed, 101 insertions(+), 73 deletions(-)
+
+diff --git a/lib/screens/catalog/downloads_screen.dart b/lib/screens/catalog/downloads_screen.dart
+index d68171e..3e587fa 100644
+--- a/lib/screens/catalog/downloads_screen.dart
++++ b/lib/screens/catalog/downloads_screen.dart
+@@ -1,74 +1,55 @@
+ import 'package:flutter/material.dart';
++import '../../state/app_state.dart';
+ 
+-/// Req. 45, 46, 47: descargas para ver sin conexión y sus restricciones.
+-class DownloadsScreen extends StatefulWidget {
++/// Req. 45, 46, 47: descargas para ver sin conexión (conectado a AppState).
++class DownloadsScreen extends StatelessWidget {
+   const DownloadsScreen({super.key});
+ 
+-  @override
+-  State<DownloadsScreen> createState() => _DownloadsScreenState();
+-}
+-
+-class _DownloadsScreenState extends State<DownloadsScreen> {
+-  final List<Map<String, Object>> _downloads = [
+-    {'titulo': 'Episodio 4', 'detalle': '124 MB · Descargado', 'progreso': 1.0},
+-    {'titulo': 'Episodio 5', 'detalle': 'Descargando · 62%', 'progreso': 0.62},
+-    {'titulo': 'Película X', 'detalle': 'En pausa · 30%', 'progreso': 0.30},
+-  ];
+-
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+       appBar: AppBar(title: const Text('Descargas')),
+-      body: ListView(
+-        padding: const EdgeInsets.all(16),
+-        children: [
+-          ..._downloads.asMap().entries.map(
+-                (entry) => Card(
+-                  child: Padding(
+-                    padding: const EdgeInsets.all(12),
+-                    child: Column(
+-                      crossAxisAlignment: CrossAxisAlignment.start,
+-                      children: [
+-                        Row(
+-                          children: [
+-                            Expanded(
+-                              child: Column(
+-                                crossAxisAlignment: CrossAxisAlignment.start,
+-                                children: [
+-                                  Text(entry.value['titulo'] as String,
+-                                      style: const TextStyle(fontWeight: FontWeight.bold)),
+-                                  Text(entry.value['detalle'] as String,
+-                                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+-                                ],
+-                              ),
+-                            ),
+-                            IconButton(
+-                              icon: const Icon(Icons.delete_outline),
+-                              onPressed: () => setState(() => _downloads.removeAt(entry.key)),
+-                            ),
+-                          ],
+-                        ),
+-                        const SizedBox(height: 4),
+-                        LinearProgressIndicator(value: entry.value['progreso'] as double),
+-                      ],
++      body: ListenableBuilder(
++        listenable: appState,
++        builder: (context, _) {
++          final downloads = appState.downloads;
++          return ListView(
++            padding: const EdgeInsets.all(16),
++            children: [
++              if (downloads.isEmpty)
++                const Padding(
++                  padding: EdgeInsets.symmetric(vertical: 32),
++                  child: Center(
++                    child: Text(
++                      'Todavía no has descargado nada.\nBusca un contenido y toca "Descargar".',
++                      textAlign: TextAlign.center,
++                      style: TextStyle(color: Colors.grey),
++                    ),
++                  ),
++                )
++              else
++                ...downloads.map(
++                  (title) => Card(
++                    child: ListTile(
++                      leading: const Icon(Icons.check_circle, color: Colors.green),
++                      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
++                      subtitle: const Text('Descargado'),
++                      trailing: IconButton(
++                        icon: const Icon(Icons.delete_outline),
++                        onPressed: () => appState.removeDownload(title),
++                      ),
+                     ),
+                   ),
+                 ),
++              const SizedBox(height: 8),
++              const Text(
++                'Límite de dispositivos y tiempo de disponibilidad según tu plan.',
++                textAlign: TextAlign.center,
++                style: TextStyle(fontSize: 12, color: Colors.grey),
+               ),
+-          const SizedBox(height: 8),
+-          const Text(
+-            'Límite de dispositivos y tiempo de disponibilidad según tu plan.',
+-            textAlign: TextAlign.center,
+-            style: TextStyle(fontSize: 12, color: Colors.grey),
+-          ),
+-          const SizedBox(height: 16),
+-          OutlinedButton(
+-            onPressed: () {
+-              // TODO: navegar al catálogo para elegir qué descargar.
+-            },
+-            child: const Text('Descargar más contenido'),
+-          ),
+-        ],
++            ],
++          );
++        },
+       ),
+     );
+   }
+diff --git a/lib/screens/content_detail_screen.dart b/lib/screens/content_detail_screen.dart
+index d4c797c..573e1d5 100644
+--- a/lib/screens/content_detail_screen.dart
++++ b/lib/screens/content_detail_screen.dart
+@@ -61,23 +61,44 @@ class ContentDetailScreen extends StatelessWidget {
+                   listenable: appState,
+                   builder: (context, _) {
+                     final inMyList = appState.isInMyList(title);
+-                    return Row(
++                    final downloaded = appState.isDownloaded(title);
++                    return Column(
+                       children: [
+-                        Expanded(
+-                          child: OutlinedButton.icon(
+-                            icon: Icon(inMyList ? Icons.favorite : Icons.favorite_border),
+-                            label: Text(inMyList ? 'En mi lista' : '+ Mi lista'),
+-                            onPressed: () => appState.toggleMyList(title),
+-                          ),
++                        Row(
++                          children: [
++                            Expanded(
++                              child: OutlinedButton.icon(
++                                icon: Icon(inMyList ? Icons.favorite : Icons.favorite_border),
++                                label: Text(inMyList ? 'En mi lista' : '+ Mi lista'),
++                                onPressed: () => appState.toggleMyList(title),
++                              ),
++                            ),
++                            const SizedBox(width: 8),
++                            Expanded(
++                              child: OutlinedButton.icon(
++                                icon: const Icon(Icons.share),
++                                label: const Text('Compartir'),
++                                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
++                                  const SnackBar(content: Text('Enlace copiado para compartir')),
++                                ),
++                              ),
++                            ),
++                          ],
+                         ),
+-                        const SizedBox(width: 8),
+-                        Expanded(
++                        const SizedBox(height: 8),
++                        SizedBox(
++                          width: double.infinity,
+                           child: OutlinedButton.icon(
+-                            icon: const Icon(Icons.share),
+-                            label: const Text('Compartir'),
+-                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+-                              const SnackBar(content: Text('Enlace copiado para compartir')),
+-                            ),
++                            icon: Icon(downloaded ? Icons.check_circle : Icons.download_outlined),
++                            label: Text(downloaded ? 'Descargado' : 'Descargar'),
++                            onPressed: downloaded
++                                ? null
++                                : () {
++                                    appState.downloadContent(title);
++                                    ScaffoldMessenger.of(context).showSnackBar(
++                                      const SnackBar(content: Text('Descarga completa')),
++                                    );
++                                  },
+                           ),
+                         ),
+                       ],
+diff --git a/lib/state/app_state.dart b/lib/state/app_state.dart
+index e41d05a..3ceea50 100644
+--- a/lib/state/app_state.dart
++++ b/lib/state/app_state.dart
+@@ -15,6 +15,7 @@ class AppState extends ChangeNotifier {
+   static const _tokenBalanceKey = 'tokenBalance';
+   static const _myListKey = 'myList';
+   static const _isLoggedInKey = 'isLoggedIn';
++  static const _downloadsKey = 'downloads';
+ 
+   SharedPreferences? _prefs;
+ 
+@@ -34,6 +35,12 @@ class AppState extends ChangeNotifier {
+   final Set<String> _myList = {};
+   bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
+ 
++  // Descargas: por simplicidad se marcan como completas al instante
++  // (no hay una descarga real en progreso, es solo para la demo).
++  final Set<String> _downloads = {};
++  List<String> get downloads => List.unmodifiable(_downloads);
++  bool isDownloaded(String contentTitle) => _downloads.contains(contentTitle);
++
+   /// Carga el estado guardado en el dispositivo. Llamar una vez al inicio,
+   /// antes de runApp(), para que la app abra ya con los datos reales.
+   Future<void> load() async {
+@@ -46,6 +53,12 @@ class AppState extends ChangeNotifier {
+         ..clear()
+         ..addAll(savedList);
+     }
++    final savedDownloads = _prefs!.getStringList(_downloadsKey);
++    if (savedDownloads != null) {
++      _downloads
++        ..clear()
++        ..addAll(savedDownloads);
++    }
+     notifyListeners();
+   }
+ 
+@@ -53,6 +66,19 @@ class AppState extends ChangeNotifier {
+     final prefs = _prefs ??= await SharedPreferences.getInstance();
+     await prefs.setInt(_tokenBalanceKey, _tokenBalance);
+     await prefs.setStringList(_myListKey, _myList.toList());
++    await prefs.setStringList(_downloadsKey, _downloads.toList());
++  }
++
++  void downloadContent(String contentTitle) {
++    _downloads.add(contentTitle);
++    notifyListeners();
++    _persist();
++  }
++
++  void removeDownload(String contentTitle) {
++    _downloads.remove(contentTitle);
++    notifyListeners();
++    _persist();
+   }
+ 
+   /// Marca la sesión como iniciada y lo recuerda en el dispositivo.
+-- 
+2.43.0
+

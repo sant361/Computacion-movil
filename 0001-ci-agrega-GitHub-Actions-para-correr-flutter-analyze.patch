@@ -1,0 +1,69 @@
+From 0259a4ed301df60501982c87794cf31821af4258 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Fri, 16 Oct 2026 01:33:20 +0000
+Subject: [PATCH] ci: agrega GitHub Actions para correr flutter analyze y
+ flutter test en cada push
+
+---
+ .github/workflows/flutter-ci.yml | 31 +++++++++++++++++++++++++++++++
+ README.md                        |  9 +++++++++
+ 2 files changed, 40 insertions(+)
+ create mode 100644 .github/workflows/flutter-ci.yml
+
+diff --git a/.github/workflows/flutter-ci.yml b/.github/workflows/flutter-ci.yml
+new file mode 100644
+index 0000000..87210e1
+--- /dev/null
++++ b/.github/workflows/flutter-ci.yml
+@@ -0,0 +1,31 @@
++name: Flutter CI
++
++# Corre automáticamente en cada push y en cada pull request hacia main.
++on:
++  push:
++    branches: [main]
++  pull_request:
++    branches: [main]
++
++jobs:
++  test:
++    name: Analizar y probar
++    runs-on: ubuntu-latest
++    steps:
++      - name: Descargar el código
++        uses: actions/checkout@v4
++
++      - name: Instalar Flutter
++        uses: subosito/flutter-action@v2
++        with:
++          flutter-version: '3.27.0'
++          channel: 'stable'
++
++      - name: Instalar dependencias
++        run: flutter pub get
++
++      - name: Revisar el código (flutter analyze)
++        run: flutter analyze
++
++      - name: Correr las pruebas (flutter test)
++        run: flutter test
+diff --git a/README.md b/README.md
+index a39d9a5..1e0096d 100644
+--- a/README.md
++++ b/README.md
+@@ -35,3 +35,12 @@ Para correrlas, dentro de la carpeta del proyecto:
+ ```
+ flutter test
+ ```
++
++## Integración continua (GitHub Actions)
++
++El archivo `.github/workflows/flutter-ci.yml` hace que GitHub corra automáticamente
++`flutter analyze` y `flutter test` cada vez que subes un cambio (`git push`) a la
++rama `main`, o cuando abres un pull request. Si algo falla, aparece una ❌ roja
++junto al commit en GitHub (en vez de enterarte solo cuando lo corres tú mismo
++en tu computador). Puedes ver el resultado en la pestaña **Actions** del
++repositorio en GitHub.
+-- 
+2.43.0
+

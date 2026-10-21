@@ -1,0 +1,364 @@
+From 1594fe8cbd3e76efad50af98347cf394db7e4993 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Fri, 16 Oct 2026 06:11:00 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20conecta=20Login,=20Registro,=20Recupera?=
+ =?UTF-8?q?r=20contrase=C3=B1a=20y=20Cerrar=20sesi=C3=B3n=20a=20Firebase?=
+ =?UTF-8?q?=20Authentication=20real?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/main.dart                                 |  8 ++-
+ lib/screens/auth/forgot_password_screen.dart  | 26 +++++--
+ lib/screens/auth/login_screen.dart            | 69 ++++++++++++++++---
+ lib/screens/auth/register_screen.dart         | 63 ++++++++++++++---
+ lib/screens/payments/subscription_screen.dart |  2 +
+ 5 files changed, 141 insertions(+), 27 deletions(-)
+
+diff --git a/lib/main.dart b/lib/main.dart
+index d154fbb..d65c1f9 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -1,11 +1,15 @@
++import 'package:firebase_core/firebase_core.dart';
+ import 'package:flutter/material.dart';
++import 'firebase_options.dart';
+ import 'screens/auth/login_screen.dart';
+ import 'screens/home_screen.dart';
+ import 'state/app_state.dart';
+ 
+-void main() {
+-  // Asegura que los plugins (como shared_preferences) estén listos antes de usarlos.
++Future<void> main() async {
+   WidgetsFlutterBinding.ensureInitialized();
++  // firebase_options.dart lo genera "flutterfire configure" automáticamente
++  // con los datos de TU proyecto de Firebase; no se edita a mano.
++  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+   runApp(const StreamingApp());
+ }
+ 
+diff --git a/lib/screens/auth/forgot_password_screen.dart b/lib/screens/auth/forgot_password_screen.dart
+index 3139c1e..e578b5d 100644
+--- a/lib/screens/auth/forgot_password_screen.dart
++++ b/lib/screens/auth/forgot_password_screen.dart
+@@ -1,7 +1,8 @@
++import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
+ import '../../widgets/primary_button.dart';
+ 
+-/// Req. 5: recuperación de contraseña.
++/// Req. 5: recuperación de contraseña real con Firebase Authentication.
+ class ForgotPasswordScreen extends StatefulWidget {
+   const ForgotPasswordScreen({super.key});
+ 
+@@ -12,6 +13,7 @@ class ForgotPasswordScreen extends StatefulWidget {
+ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+   final _formKey = GlobalKey<FormState>();
+   final _emailController = TextEditingController();
++  bool _loading = false;
+ 
+   @override
+   void dispose() {
+@@ -19,13 +21,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+     super.dispose();
+   }
+ 
+-  void _submit() {
+-    if (_formKey.currentState!.validate()) {
+-      // TODO: enviar la solicitud de recuperación al backend.
++  Future<void> _submit() async {
++    if (!_formKey.currentState!.validate()) return;
++
++    setState(() => _loading = true);
++    try {
++      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text.trim());
++      if (!mounted) return;
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(content: Text('Enlace enviado a ${_emailController.text}')),
+       );
+       Navigator.pop(context);
++    } on FirebaseAuthException catch (e) {
++      if (!mounted) return;
++      final mensaje = e.code == 'user-not-found'
++          ? 'No existe una cuenta con ese correo.'
++          : 'No se pudo enviar el enlace (${e.code}).';
++      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
++    } finally {
++      if (mounted) setState(() => _loading = false);
+     }
+   }
+ 
+@@ -52,7 +66,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+                 },
+               ),
+               const SizedBox(height: 16),
+-              PrimaryButton(label: 'ENVIAR ENLACE', onPressed: _submit),
++              _loading
++                  ? const Center(child: CircularProgressIndicator())
++                  : PrimaryButton(label: 'ENVIAR ENLACE', onPressed: _submit),
+             ],
+           ),
+         ),
+diff --git a/lib/screens/auth/login_screen.dart b/lib/screens/auth/login_screen.dart
+index 8a07728..b6ae35b 100644
+--- a/lib/screens/auth/login_screen.dart
++++ b/lib/screens/auth/login_screen.dart
+@@ -1,3 +1,4 @@
++import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
+ import '../../widgets/primary_button.dart';
+ import '../../state/app_state.dart';
+@@ -5,7 +6,7 @@ import '../home_screen.dart';
+ import 'register_screen.dart';
+ import 'forgot_password_screen.dart';
+ 
+-/// Req. 1, 2, 3, 5: inicio de sesión, autocompletar, recuperación.
++/// Req. 1, 2, 3, 5: inicio de sesión real con Firebase Authentication.
+ class LoginScreen extends StatefulWidget {
+   const LoginScreen({super.key});
+ 
+@@ -15,32 +16,69 @@ class LoginScreen extends StatefulWidget {
+ 
+ class _LoginScreenState extends State<LoginScreen> {
+   final _formKey = GlobalKey<FormState>();
+-  final _usernameController = TextEditingController();
++  final _emailController = TextEditingController();
+   final _passwordController = TextEditingController();
+   bool _rememberMe = false;
+   bool _obscurePassword = true;
++  bool _loading = false;
++  String? _errorMessage;
+ 
+   @override
+   void dispose() {
+-    _usernameController.dispose();
++    _emailController.dispose();
+     _passwordController.dispose();
+     super.dispose();
+   }
+ 
+   void _autofill() {
+-    _usernameController.text = 'usuario_demo';
++    // Cambia estos valores por un usuario de prueba que hayas creado en
++    // Firebase Authentication (consola de Firebase → Authentication → Users).
++    _emailController.text = 'usuario_demo@correo.com';
+     _passwordController.text = 'Demo1234';
+   }
+ 
++  /// Traduce los códigos de error de Firebase a mensajes claros en español.
++  String _mensajeDeError(FirebaseAuthException e) {
++    switch (e.code) {
++      case 'user-not-found':
++        return 'No existe una cuenta con ese correo.';
++      case 'wrong-password':
++      case 'invalid-credential':
++        return 'Correo o contraseña incorrectos.';
++      case 'invalid-email':
++        return 'El correo no tiene un formato válido.';
++      case 'user-disabled':
++        return 'Esta cuenta fue deshabilitada.';
++      case 'too-many-requests':
++        return 'Demasiados intentos. Intenta de nuevo más tarde.';
++      default:
++        return 'No se pudo iniciar sesión (${e.code}).';
++    }
++  }
++
+   Future<void> _submit() async {
+-    if (_formKey.currentState!.validate()) {
+-      // TODO: validar credenciales contra el backend real antes de llamar a login().
++    if (!_formKey.currentState!.validate()) return;
++
++    setState(() {
++      _loading = true;
++      _errorMessage = null;
++    });
++
++    try {
++      await FirebaseAuth.instance.signInWithEmailAndPassword(
++        email: _emailController.text.trim(),
++        password: _passwordController.text,
++      );
+       await appState.login();
+       if (!mounted) return;
+       Navigator.pushReplacement(
+         context,
+         MaterialPageRoute(builder: (_) => const HomeScreen()),
+       );
++    } on FirebaseAuthException catch (e) {
++      setState(() => _errorMessage = _mensajeDeError(e));
++    } finally {
++      if (mounted) setState(() => _loading = false);
+     }
+   }
+ 
+@@ -59,12 +97,17 @@ class _LoginScreenState extends State<LoginScreen> {
+                 const Text('Login', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                 const SizedBox(height: 24),
+                 TextFormField(
+-                  controller: _usernameController,
++                  controller: _emailController,
++                  keyboardType: TextInputType.emailAddress,
+                   decoration: const InputDecoration(
+                     prefixIcon: Icon(Icons.person_outline),
+-                    labelText: 'Username',
++                    labelText: 'Correo electrónico',
+                   ),
+-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa tu usuario' : null,
++                  validator: (v) {
++                    if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
++                    if (!v.contains('@')) return 'Ingresa un correo válido';
++                    return null;
++                  },
+                 ),
+                 const SizedBox(height: 12),
+                 TextFormField(
+@@ -84,6 +127,10 @@ class _LoginScreenState extends State<LoginScreen> {
+                     return null;
+                   },
+                 ),
++                if (_errorMessage != null) ...[
++                  const SizedBox(height: 8),
++                  Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 13)),
++                ],
+                 Align(
+                   alignment: Alignment.centerRight,
+                   child: TextButton(
+@@ -102,7 +149,9 @@ class _LoginScreenState extends State<LoginScreen> {
+                   contentPadding: EdgeInsets.zero,
+                 ),
+                 const SizedBox(height: 8),
+-                PrimaryButton(label: 'LOGIN', onPressed: _submit),
++                _loading
++                    ? const Center(child: CircularProgressIndicator())
++                    : PrimaryButton(label: 'LOGIN', onPressed: _submit),
+                 const SizedBox(height: 16),
+                 OutlinedButton(
+                   onPressed: _autofill, // req. 2 — autocompletar datos de prueba.
+diff --git a/lib/screens/auth/register_screen.dart b/lib/screens/auth/register_screen.dart
+index 1d906f4..5dfa1fb 100644
+--- a/lib/screens/auth/register_screen.dart
++++ b/lib/screens/auth/register_screen.dart
+@@ -1,8 +1,9 @@
++import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
+ import '../../widgets/primary_button.dart';
+ import 'email_verification_screen.dart';
+ 
+-/// Req. 1: registro de usuario.
++/// Req. 1: registro de usuario real con Firebase Authentication.
+ class RegisterScreen extends StatefulWidget {
+   const RegisterScreen({super.key});
+ 
+@@ -17,6 +18,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
+   final _passwordController = TextEditingController();
+   final _confirmPasswordController = TextEditingController();
+   bool _acceptedTerms = false;
++  bool _loading = false;
++  String? _errorMessage;
+ 
+   @override
+   void dispose() {
+@@ -27,17 +30,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
+     super.dispose();
+   }
+ 
+-  void _submit() {
+-    if (_formKey.currentState!.validate() && _acceptedTerms) {
+-      // TODO: enviar el registro al backend.
+-      Navigator.push(
+-        context,
+-        MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: _emailController.text)),
+-      );
+-    } else if (!_acceptedTerms) {
++  String _mensajeDeError(FirebaseAuthException e) {
++    switch (e.code) {
++      case 'email-already-in-use':
++        return 'Ya existe una cuenta con ese correo.';
++      case 'invalid-email':
++        return 'El correo no tiene un formato válido.';
++      case 'weak-password':
++        return 'La contraseña es muy débil.';
++      default:
++        return 'No se pudo crear la cuenta (${e.code}).';
++    }
++  }
++
++  Future<void> _submit() async {
++    if (!_formKey.currentState!.validate()) return;
++    if (!_acceptedTerms) {
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(content: Text('Debes autorizar el tratamiento de tus datos personales')),
+       );
++      return;
++    }
++
++    setState(() {
++      _loading = true;
++      _errorMessage = null;
++    });
++
++    try {
++      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
++        email: _emailController.text.trim(),
++        password: _passwordController.text,
++      );
++      await credential.user?.updateDisplayName(_nameController.text.trim());
++      // Firebase ya puede enviar un correo de verificación real:
++      await credential.user?.sendEmailVerification();
++
++      if (!mounted) return;
++      Navigator.push(
++        context,
++        MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: _emailController.text.trim())),
++      );
++    } on FirebaseAuthException catch (e) {
++      setState(() => _errorMessage = _mensajeDeError(e));
++    } finally {
++      if (mounted) setState(() => _loading = false);
+     }
+   }
+ 
+@@ -88,6 +125,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
+                 validator: (v) =>
+                     (v != _passwordController.text) ? 'Las contraseñas no coinciden' : null,
+               ),
++              if (_errorMessage != null) ...[
++                const SizedBox(height: 8),
++                Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 13)),
++              ],
+               CheckboxListTile(
+                 value: _acceptedTerms,
+                 onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
+@@ -96,7 +137,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
+                 contentPadding: EdgeInsets.zero,
+               ),
+               const SizedBox(height: 16),
+-              PrimaryButton(label: 'REGISTRARME', onPressed: _submit),
++              _loading
++                  ? const Center(child: CircularProgressIndicator())
++                  : PrimaryButton(label: 'REGISTRARME', onPressed: _submit),
+             ],
+           ),
+         ),
+diff --git a/lib/screens/payments/subscription_screen.dart b/lib/screens/payments/subscription_screen.dart
+index 596d6e8..49a7f6f 100644
+--- a/lib/screens/payments/subscription_screen.dart
++++ b/lib/screens/payments/subscription_screen.dart
+@@ -1,3 +1,4 @@
++import 'package:firebase_auth/firebase_auth.dart';
+ import 'package:flutter/material.dart';
+ import 'billing_screen.dart';
+ import 'payment_methods_screen.dart';
+@@ -103,6 +104,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
+             leading: const Icon(Icons.logout, color: Colors.red),
+             title: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
+             onTap: () async {
++              await FirebaseAuth.instance.signOut();
+               await appState.logout();
+               if (!context.mounted) return;
+               Navigator.pushAndRemoveUntil(
+-- 
+2.43.0
+

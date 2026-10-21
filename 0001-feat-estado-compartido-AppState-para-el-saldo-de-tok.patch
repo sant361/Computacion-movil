@@ -1,0 +1,388 @@
+From 3e70cfd3d4a0226b3c18e8f1f9183ee34b14ec4a Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Thu, 15 Oct 2026 04:41:23 +0000
+Subject: [PATCH] feat: estado compartido (AppState) para el saldo de tokens,
+ conectado en Mis tokens, Ganar tokens, Resultado de juego y Desbloqueo
+
+---
+ lib/screens/tokens/earn_tokens_screen.dart    |   4 +-
+ lib/screens/tokens/game_result_screen.dart    |  19 ++-
+ lib/screens/tokens/tokens_screen.dart         |  86 +++++++------
+ lib/screens/tokens/unlock_confirm_screen.dart | 118 +++++++++---------
+ lib/state/app_state.dart                      |  35 ++++++
+ 5 files changed, 157 insertions(+), 105 deletions(-)
+ create mode 100644 lib/state/app_state.dart
+
+diff --git a/lib/screens/tokens/earn_tokens_screen.dart b/lib/screens/tokens/earn_tokens_screen.dart
+index 2bdc7fe..3d7a858 100644
+--- a/lib/screens/tokens/earn_tokens_screen.dart
++++ b/lib/screens/tokens/earn_tokens_screen.dart
+@@ -1,4 +1,5 @@
+ import 'package:flutter/material.dart';
++import '../../state/app_state.dart';
+ import 'games_screen.dart';
+ 
+ /// Req. 77, 78: ver un anuncio a cambio de tokens.
+@@ -33,7 +34,8 @@ class EarnTokensScreen extends StatelessWidget {
+             const SizedBox(height: 24),
+             ElevatedButton(
+               onPressed: () {
+-                // TODO: reproducir el anuncio real y acreditar tokens al backend.
++                // TODO: reproducir el anuncio real antes de acreditar los tokens.
++                appState.addTokens(50, reason: 'Anuncio visto');
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('+50 tokens acreditados')),
+                 );
+diff --git a/lib/screens/tokens/game_result_screen.dart b/lib/screens/tokens/game_result_screen.dart
+index 0c04864..7717c32 100644
+--- a/lib/screens/tokens/game_result_screen.dart
++++ b/lib/screens/tokens/game_result_screen.dart
+@@ -1,13 +1,26 @@
+ import 'package:flutter/material.dart';
++import '../../state/app_state.dart';
+ import 'tokens_screen.dart';
+ 
+ /// Req. 79, 80: resultado tras jugar un minijuego y tokens ganados.
+-class GameResultScreen extends StatelessWidget {
++class GameResultScreen extends StatefulWidget {
+   final String gameName;
+   final int tokensEarned;
+ 
+   const GameResultScreen({super.key, required this.gameName, required this.tokensEarned});
+ 
++  @override
++  State<GameResultScreen> createState() => _GameResultScreenState();
++}
++
++class _GameResultScreenState extends State<GameResultScreen> {
++  @override
++  void initState() {
++    super.initState();
++    // Se acreditan los tokens una sola vez, al entrar a la pantalla de resultado.
++    appState.addTokens(widget.tokensEarned, reason: 'Juego · ${widget.gameName}');
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+@@ -21,7 +34,7 @@ class GameResultScreen extends StatelessWidget {
+               const SizedBox(height: 16),
+               const Text('¡Buen trabajo!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+               const SizedBox(height: 4),
+-              Text('Completaste $gameName', style: const TextStyle(color: Colors.grey)),
++              Text('Completaste ${widget.gameName}', style: const TextStyle(color: Colors.grey)),
+               const SizedBox(height: 24),
+               Card(
+                 child: Padding(
+@@ -32,7 +45,7 @@ class GameResultScreen extends StatelessWidget {
+                       const Divider(),
+                       _resultRow('Tiempo', '01:42'),
+                       const Divider(),
+-                      _resultRow('Tokens ganados', '+$tokensEarned'),
++                      _resultRow('Tokens ganados', '+${widget.tokensEarned}'),
+                     ],
+                   ),
+                 ),
+diff --git a/lib/screens/tokens/tokens_screen.dart b/lib/screens/tokens/tokens_screen.dart
+index b352128..2d81e3f 100644
+--- a/lib/screens/tokens/tokens_screen.dart
++++ b/lib/screens/tokens/tokens_screen.dart
+@@ -1,63 +1,61 @@
+ import 'package:flutter/material.dart';
++import '../../state/app_state.dart';
+ import 'earn_tokens_screen.dart';
+ import 'games_screen.dart';
+ 
+-/// Req. 74, 75: saldo de tokens e historial.
++/// Req. 74, 75: saldo de tokens e historial (conectado a AppState).
+ class TokensScreen extends StatelessWidget {
+   const TokensScreen({super.key});
+ 
+-  static const int balance = 1250;
+-
+-  static const history = [
+-    {'titulo': 'Anuncio visto', 'valor': '+50'},
+-    {'titulo': 'Desbloqueo capítulo 12', 'valor': '-120'},
+-    {'titulo': 'Juego · Trivia', 'valor': '+80'},
+-  ];
+-
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+       appBar: AppBar(title: const Text('Mis tokens')),
+-      body: ListView(
+-        padding: const EdgeInsets.all(16),
+-        children: [
+-          Card(
+-            color: const Color(0xFFF7F3E9),
+-            child: ListTile(
+-              leading: const CircleAvatar(
+-                backgroundColor: Color(0xFFEBC86E),
+-                child: Text('T', style: TextStyle(fontWeight: FontWeight.bold)),
++      body: ListenableBuilder(
++        listenable: appState,
++        builder: (context, _) => ListView(
++          padding: const EdgeInsets.all(16),
++          children: [
++            Card(
++              color: const Color(0xFFF7F3E9),
++              child: ListTile(
++                leading: const CircleAvatar(
++                  backgroundColor: Color(0xFFEBC86E),
++                  child: Text('T', style: TextStyle(fontWeight: FontWeight.bold)),
++                ),
++                title: const Text('Saldo disponible', style: TextStyle(color: Colors.grey)),
++                subtitle: Text('${appState.tokenBalance} tokens',
++                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+               ),
+-              title: const Text('Saldo disponible', style: TextStyle(color: Colors.grey)),
+-              subtitle: const Text('$balance tokens', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+             ),
+-          ),
+-          const SizedBox(height: 16),
+-          OutlinedButton(
+-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EarnTokensScreen())),
+-            child: const Text('Ver anuncio y ganar tokens'),
+-          ),
+-          const SizedBox(height: 8),
+-          OutlinedButton(
+-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())),
+-            child: const Text('Ganar tokens con juegos'),
+-          ),
+-          const Divider(height: 32),
+-          const Text('Historial reciente', style: TextStyle(fontWeight: FontWeight.bold)),
+-          ...history.map(
+-            (h) => ListTile(
+-              title: Text(h['titulo']!),
+-              trailing: Text(
+-                h['valor']!,
+-                style: TextStyle(
+-                  fontWeight: FontWeight.bold,
+-                  color: h['valor']!.startsWith('+') ? Colors.green : Colors.red,
++            const SizedBox(height: 16),
++            OutlinedButton(
++              onPressed: () =>
++                  Navigator.push(context, MaterialPageRoute(builder: (_) => const EarnTokensScreen())),
++              child: const Text('Ver anuncio y ganar tokens'),
++            ),
++            const SizedBox(height: 8),
++            OutlinedButton(
++              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())),
++              child: const Text('Ganar tokens con juegos'),
++            ),
++            const Divider(height: 32),
++            const Text('Historial reciente', style: TextStyle(fontWeight: FontWeight.bold)),
++            ...appState.tokenHistory.map(
++              (h) => ListTile(
++                title: Text(h['titulo']!),
++                trailing: Text(
++                  h['valor']!,
++                  style: TextStyle(
++                    fontWeight: FontWeight.bold,
++                    color: h['valor']!.startsWith('+') ? Colors.green : Colors.red,
++                  ),
+                 ),
++                contentPadding: EdgeInsets.zero,
+               ),
+-              contentPadding: EdgeInsets.zero,
+             ),
+-          ),
+-        ],
++          ],
++        ),
+       ),
+     );
+   }
+diff --git a/lib/screens/tokens/unlock_confirm_screen.dart b/lib/screens/tokens/unlock_confirm_screen.dart
+index 671fb0c..e87539f 100644
+--- a/lib/screens/tokens/unlock_confirm_screen.dart
++++ b/lib/screens/tokens/unlock_confirm_screen.dart
+@@ -1,83 +1,87 @@
+ import 'package:flutter/material.dart';
++import '../../state/app_state.dart';
+ 
+-/// Req. 82, 83: confirmar el desbloqueo de un capítulo con tokens.
++/// Req. 82, 83: confirmar el desbloqueo de un capítulo con tokens (conectado a AppState).
+ class UnlockConfirmScreen extends StatelessWidget {
+   final String chapterName;
+   final int cost;
+-  final int currentBalance;
+ 
+   const UnlockConfirmScreen({
+     super.key,
+     this.chapterName = 'Capítulo 13',
+     this.cost = 120,
+-    this.currentBalance = 1250,
+   });
+ 
+   @override
+   Widget build(BuildContext context) {
+-    final remaining = currentBalance - cost;
+-    final canAfford = remaining >= 0;
+-
+     return Scaffold(
+       appBar: AppBar(title: const Text('Desbloquear capítulo')),
+-      body: Padding(
+-        padding: const EdgeInsets.all(24),
+-        child: Column(
+-          crossAxisAlignment: CrossAxisAlignment.stretch,
+-          children: [
+-            Card(
+-              color: const Color(0xFFEEF0F4),
+-              child: Padding(
+-                padding: const EdgeInsets.all(16),
+-                child: Column(
+-                  children: [
+-                    Text(chapterName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+-                    const SizedBox(height: 4),
+-                    Text('Costo: $cost tokens'),
+-                    Text('Saldo actual: $currentBalance', style: const TextStyle(color: Colors.grey)),
+-                  ],
+-                ),
+-              ),
+-            ),
+-            const SizedBox(height: 24),
+-            Text(
+-              canAfford
+-                  ? 'Saldo después del desbloqueo: $remaining tokens'
+-                  : 'No tienes saldo suficiente para este capítulo.',
+-              textAlign: TextAlign.center,
+-              style: TextStyle(
+-                fontWeight: FontWeight.bold,
+-                color: canAfford ? Colors.black : Colors.red,
+-              ),
+-            ),
+-            const SizedBox(height: 24),
+-            Row(
++      body: ListenableBuilder(
++        listenable: appState,
++        builder: (context, _) {
++          final remaining = appState.tokenBalance - cost;
++          final canAfford = remaining >= 0;
++
++          return Padding(
++            padding: const EdgeInsets.all(24),
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.stretch,
+               children: [
+-                Expanded(
+-                  child: OutlinedButton(
+-                    onPressed: () => Navigator.pop(context),
+-                    child: const Text('Cancelar'),
++                Card(
++                  color: const Color(0xFFEEF0F4),
++                  child: Padding(
++                    padding: const EdgeInsets.all(16),
++                    child: Column(
++                      children: [
++                        Text(chapterName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
++                        const SizedBox(height: 4),
++                        Text('Costo: $cost tokens'),
++                        Text('Saldo actual: ${appState.tokenBalance}', style: const TextStyle(color: Colors.grey)),
++                      ],
++                    ),
+                   ),
+                 ),
+-                const SizedBox(width: 12),
+-                Expanded(
+-                  child: ElevatedButton(
+-                    onPressed: canAfford
+-                        ? () {
+-                            // TODO: descontar tokens en el backend y desbloquear el capítulo.
+-                            ScaffoldMessenger.of(context).showSnackBar(
+-                              const SnackBar(content: Text('Capítulo desbloqueado')),
+-                            );
+-                            Navigator.pop(context);
+-                          }
+-                        : null,
+-                    child: const Text('DESBLOQUEAR'),
++                const SizedBox(height: 24),
++                Text(
++                  canAfford
++                      ? 'Saldo después del desbloqueo: $remaining tokens'
++                      : 'No tienes saldo suficiente para este capítulo.',
++                  textAlign: TextAlign.center,
++                  style: TextStyle(
++                    fontWeight: FontWeight.bold,
++                    color: canAfford ? Colors.black : Colors.red,
+                   ),
+                 ),
++                const SizedBox(height: 24),
++                Row(
++                  children: [
++                    Expanded(
++                      child: OutlinedButton(
++                        onPressed: () => Navigator.pop(context),
++                        child: const Text('Cancelar'),
++                      ),
++                    ),
++                    const SizedBox(width: 12),
++                    Expanded(
++                      child: ElevatedButton(
++                        onPressed: canAfford
++                            ? () {
++                                appState.spendTokens(cost, reason: 'Desbloqueo $chapterName');
++                                ScaffoldMessenger.of(context).showSnackBar(
++                                  const SnackBar(content: Text('Capítulo desbloqueado')),
++                                );
++                                Navigator.pop(context);
++                              }
++                            : null,
++                        child: const Text('DESBLOQUEAR'),
++                      ),
++                    ),
++                  ],
++                ),
+               ],
+             ),
+-          ],
+-        ),
++          );
++        },
+       ),
+     );
+   }
+diff --git a/lib/state/app_state.dart b/lib/state/app_state.dart
+new file mode 100644
+index 0000000..aa9b8c0
+--- /dev/null
++++ b/lib/state/app_state.dart
+@@ -0,0 +1,35 @@
++import 'package:flutter/foundation.dart';
++
++/// Estado compartido simple de la app (sin paquetes externos de estado).
++///
++/// [appState] es una única instancia global: cualquier pantalla puede leer
++/// appState.tokenBalance, y escuchar cambios envolviendo su UI en un
++/// ListenableBuilder(listenable: appState, builder: (...) => ...).
++class AppState extends ChangeNotifier {
++  int _tokenBalance = 1250;
++  int get tokenBalance => _tokenBalance;
++
++  final List<Map<String, String>> _tokenHistory = [
++    {'titulo': 'Anuncio visto', 'valor': '+50'},
++    {'titulo': 'Desbloqueo capítulo 12', 'valor': '-120'},
++    {'titulo': 'Juego · Trivia', 'valor': '+80'},
++  ];
++  List<Map<String, String>> get tokenHistory => List.unmodifiable(_tokenHistory);
++
++  void addTokens(int amount, {required String reason}) {
++    _tokenBalance += amount;
++    _tokenHistory.insert(0, {'titulo': reason, 'valor': '+$amount'});
++    notifyListeners();
++  }
++
++  bool spendTokens(int amount, {required String reason}) {
++    if (amount > _tokenBalance) return false;
++    _tokenBalance -= amount;
++    _tokenHistory.insert(0, {'titulo': reason, 'valor': '-$amount'});
++    notifyListeners();
++    return true;
++  }
++}
++
++/// Instancia única compartida por toda la app.
++final AppState appState = AppState();
+-- 
+2.43.0
+

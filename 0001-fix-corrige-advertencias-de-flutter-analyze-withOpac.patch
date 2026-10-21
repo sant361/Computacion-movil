@@ -1,0 +1,48 @@
+From a740fd39de56637114335374f538b920d933d84a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 21 Oct 2026 16:55:06 -0500
+Subject: [PATCH] fix: corrige advertencias de flutter analyze (withOpacity y
+ variable sin usar)
+
+- Reemplaza Colors.withOpacity() (deprecated) por withValues(alpha:)
+  en users_roles_screen.dart
+- Elimina el getter _code sin usar en email_verification_screen.dart
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MGTVqKTyALf5JDawT7asgd
+---
+ lib/screens/admin/users_roles_screen.dart       | 4 +++-
+ lib/screens/auth/email_verification_screen.dart | 2 --
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/lib/screens/admin/users_roles_screen.dart b/lib/screens/admin/users_roles_screen.dart
+index e4e09f2..0cd24d6 100644
+--- a/lib/screens/admin/users_roles_screen.dart
++++ b/lib/screens/admin/users_roles_screen.dart
+@@ -34,7 +34,9 @@ class UsersRolesScreen extends StatelessWidget {
+               trailing: Chip(
+                 label: Text(u['estado'] as String),
+                 backgroundColor:
+-                    (u['activo'] as bool) ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
++                    (u['activo'] as bool)
++                        ? Colors.green.withValues(alpha: 0.1)
++                        : Colors.red.withValues(alpha: 0.1),
+                 labelStyle: TextStyle(color: (u['activo'] as bool) ? Colors.green : Colors.red),
+               ),
+             ),
+diff --git a/lib/screens/auth/email_verification_screen.dart b/lib/screens/auth/email_verification_screen.dart
+index bbd31b0..34dec98 100644
+--- a/lib/screens/auth/email_verification_screen.dart
++++ b/lib/screens/auth/email_verification_screen.dart
+@@ -14,8 +14,6 @@ class EmailVerificationScreen extends StatefulWidget {
+ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
+   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+ 
+-  String get _code => _controllers.map((c) => c.text).join();
+-
+   @override
+   void dispose() {
+     for (final c in _controllers) {
+-- 
+2.43.0
+

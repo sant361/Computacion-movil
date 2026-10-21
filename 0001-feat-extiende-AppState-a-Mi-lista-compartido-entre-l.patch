@@ -1,0 +1,196 @@
+From d369b80d3fb9197b1a77fa47a38ec5e5487c3b32 Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Thu, 15 Oct 2026 04:42:50 +0000
+Subject: [PATCH] feat: extiende AppState a Mi lista, compartido entre la Ficha
+ de contenido y el Reproductor
+
+---
+ lib/screens/content_detail_screen.dart | 58 +++++++++++++-------------
+ lib/screens/player_screen.dart         | 20 ++++++---
+ lib/state/app_state.dart               | 15 +++++++
+ 3 files changed, 58 insertions(+), 35 deletions(-)
+
+diff --git a/lib/screens/content_detail_screen.dart b/lib/screens/content_detail_screen.dart
+index c4df7dc..d4c797c 100644
+--- a/lib/screens/content_detail_screen.dart
++++ b/lib/screens/content_detail_screen.dart
+@@ -1,19 +1,13 @@
+ import 'package:flutter/material.dart';
+ import 'player_screen.dart';
+ import 'tokens/access_options_screen.dart';
++import '../state/app_state.dart';
+ 
+ /// Req. 19: ficha de un contenido (serie/película) antes de reproducir.
+-class ContentDetailScreen extends StatefulWidget {
++class ContentDetailScreen extends StatelessWidget {
+   final String title;
+   const ContentDetailScreen({super.key, this.title = 'Título de la serie'});
+ 
+-  @override
+-  State<ContentDetailScreen> createState() => _ContentDetailScreenState();
+-}
+-
+-class _ContentDetailScreenState extends State<ContentDetailScreen> {
+-  bool _inMyList = false;
+-
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+@@ -33,7 +27,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
+             padding: const EdgeInsets.all(16),
+             sliver: SliverList(
+               delegate: SliverChildListDelegate([
+-                Text(widget.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
++                Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                 const SizedBox(height: 4),
+                 const Text('2026 · 3 temporadas · +14', style: TextStyle(color: Colors.grey)),
+                 const SizedBox(height: 8),
+@@ -58,31 +52,37 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
+                     label: const Text('REPRODUCIR'),
+                     onPressed: () => Navigator.push(
+                       context,
+-                      MaterialPageRoute(builder: (_) => const PlayerScreen()),
++                      MaterialPageRoute(builder: (_) => PlayerScreen(contentTitle: title)),
+                     ),
+                   ),
+                 ),
+                 const SizedBox(height: 12),
+-                Row(
+-                  children: [
+-                    Expanded(
+-                      child: OutlinedButton.icon(
+-                        icon: Icon(_inMyList ? Icons.favorite : Icons.favorite_border),
+-                        label: Text(_inMyList ? 'En mi lista' : '+ Mi lista'),
+-                        onPressed: () => setState(() => _inMyList = !_inMyList),
+-                      ),
+-                    ),
+-                    const SizedBox(width: 8),
+-                    Expanded(
+-                      child: OutlinedButton.icon(
+-                        icon: const Icon(Icons.share),
+-                        label: const Text('Compartir'),
+-                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+-                          const SnackBar(content: Text('Enlace copiado para compartir')),
++                ListenableBuilder(
++                  listenable: appState,
++                  builder: (context, _) {
++                    final inMyList = appState.isInMyList(title);
++                    return Row(
++                      children: [
++                        Expanded(
++                          child: OutlinedButton.icon(
++                            icon: Icon(inMyList ? Icons.favorite : Icons.favorite_border),
++                            label: Text(inMyList ? 'En mi lista' : '+ Mi lista'),
++                            onPressed: () => appState.toggleMyList(title),
++                          ),
+                         ),
+-                      ),
+-                    ),
+-                  ],
++                        const SizedBox(width: 8),
++                        Expanded(
++                          child: OutlinedButton.icon(
++                            icon: const Icon(Icons.share),
++                            label: const Text('Compartir'),
++                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
++                              const SnackBar(content: Text('Enlace copiado para compartir')),
++                            ),
++                          ),
++                        ),
++                      ],
++                    );
++                  },
+                 ),
+                 const SizedBox(height: 12),
+                 TextButton.icon(
+diff --git a/lib/screens/player_screen.dart b/lib/screens/player_screen.dart
+index 688b514..cc2b5a7 100644
+--- a/lib/screens/player_screen.dart
++++ b/lib/screens/player_screen.dart
+@@ -1,6 +1,7 @@
+ import 'package:flutter/material.dart';
+ import 'package:video_player/video_player.dart';
+ import 'fullscreen_player_screen.dart';
++import '../state/app_state.dart';
+ 
+ /// Req. 20-27, 29, 30, 34, 48: reproductor de video (Serie).
+ ///
+@@ -8,7 +9,8 @@ import 'fullscreen_player_screen.dart';
+ /// contenido real sin depender de un backend. Para producción, reemplaza la
+ /// URL de [_sampleVideoUrl] por la del video real del episodio.
+ class PlayerScreen extends StatefulWidget {
+-  const PlayerScreen({super.key});
++  final String contentTitle;
++  const PlayerScreen({super.key, this.contentTitle = 'Serie · Temporada 1'});
+ 
+   @override
+   State<PlayerScreen> createState() => _PlayerScreenState();
+@@ -21,7 +23,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
+   late final VideoPlayerController _controller;
+   bool _autoplay = true;
+   bool _watchFromStart = true;
+-  bool _inMyList = false;
++
+   bool? _liked;
+   String _subtitles = 'Desactivados';
+   String _audioLang = 'Español';
+@@ -217,7 +219,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
+             child: const Text('Siguiente episodio ▶'),
+           ),
+           const SizedBox(height: 16),
+-          const Text('Serie · Temporada 1', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
++          Text(widget.contentTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+           const SizedBox(height: 8),
+           Row(
+             children: [
+@@ -232,12 +234,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
+               const Spacer(),
+               OutlinedButton.icon(
+                 onPressed: () {
+-                  setState(() => _inMyList = !_inMyList);
++                  appState.toggleMyList(widget.contentTitle);
++                  setState(() {});
+                   ScaffoldMessenger.of(context).showSnackBar(
+-                    SnackBar(content: Text(_inMyList ? 'Agregado a Mi lista' : 'Quitado de Mi lista')),
++                    SnackBar(
++                      content: Text(
++                        appState.isInMyList(widget.contentTitle) ? 'Agregado a Mi lista' : 'Quitado de Mi lista',
++                      ),
++                    ),
+                   );
+                 }, // req. 34 mi lista
+-                icon: Icon(_inMyList ? Icons.favorite : Icons.favorite_border, size: 18),
++                icon: Icon(appState.isInMyList(widget.contentTitle) ? Icons.favorite : Icons.favorite_border,
++                    size: 18),
+                 label: const Text('Lista'),
+               ),
+             ],
+diff --git a/lib/state/app_state.dart b/lib/state/app_state.dart
+index aa9b8c0..b41ebe4 100644
+--- a/lib/state/app_state.dart
++++ b/lib/state/app_state.dart
+@@ -29,6 +29,21 @@ class AppState extends ChangeNotifier {
+     notifyListeners();
+     return true;
+   }
++
++  // "Mi lista": identifica cada contenido por su título. En una versión con
++  // backend real, esto sería el id del contenido en vez del título.
++  final Set<String> _myList = {};
++
++  bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
++
++  void toggleMyList(String contentTitle) {
++    if (_myList.contains(contentTitle)) {
++      _myList.remove(contentTitle);
++    } else {
++      _myList.add(contentTitle);
++    }
++    notifyListeners();
++  }
+ }
+ 
+ /// Instancia única compartida por toda la app.
+-- 
+2.43.0
+

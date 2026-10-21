@@ -1,0 +1,577 @@
+From 0ec37d243bbc4947eb9a243614711dc94cb143ef Mon Sep 17 00:00:00 2001
+From: Streaming App Dev <dev@streamingapp.com>
+Date: Wed, 14 Oct 2026 22:31:12 +0000
+Subject: [PATCH 3/4] =?UTF-8?q?feat:=20agrega=20validaci=C3=B3n=20de=20for?=
+ =?UTF-8?q?mularios=20(Login,=20Registro,=20Recuperar=20contrase=C3=B1a,?=
+ =?UTF-8?q?=20Agregar=20m=C3=A9todo=20de=20pago)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ lib/screens/auth/forgot_password_screen.dart  |  57 +++++--
+ lib/screens/auth/login_screen.dart            | 150 +++++++++++-------
+ lib/screens/auth/register_screen.dart         | 109 ++++++++-----
+ .../payments/add_payment_method_screen.dart   | 147 +++++++++++------
+ 4 files changed, 306 insertions(+), 157 deletions(-)
+
+diff --git a/lib/screens/auth/forgot_password_screen.dart b/lib/screens/auth/forgot_password_screen.dart
+index 55ff79a..3139c1e 100644
+--- a/lib/screens/auth/forgot_password_screen.dart
++++ b/lib/screens/auth/forgot_password_screen.dart
+@@ -2,22 +2,59 @@ import 'package:flutter/material.dart';
+ import '../../widgets/primary_button.dart';
+ 
+ /// Req. 5: recuperación de contraseña.
+-class ForgotPasswordScreen extends StatelessWidget {
++class ForgotPasswordScreen extends StatefulWidget {
+   const ForgotPasswordScreen({super.key});
+ 
++  @override
++  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
++}
++
++class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
++  final _formKey = GlobalKey<FormState>();
++  final _emailController = TextEditingController();
++
++  @override
++  void dispose() {
++    _emailController.dispose();
++    super.dispose();
++  }
++
++  void _submit() {
++    if (_formKey.currentState!.validate()) {
++      // TODO: enviar la solicitud de recuperación al backend.
++      ScaffoldMessenger.of(context).showSnackBar(
++        SnackBar(content: Text('Enlace enviado a ${_emailController.text}')),
++      );
++      Navigator.pop(context);
++    }
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+       appBar: AppBar(title: const Text('Recuperar cuenta')),
+-      body: const Padding(
+-        padding: EdgeInsets.all(24),
+-        child: Column(
+-          crossAxisAlignment: CrossAxisAlignment.stretch,
+-          children: [
+-            TextField(decoration: InputDecoration(labelText: 'Correo electrónico')),
+-            SizedBox(height: 16),
+-            PrimaryButton(label: 'ENVIAR ENLACE'),
+-          ],
++      body: Padding(
++        padding: const EdgeInsets.all(24),
++        child: Form(
++          key: _formKey,
++          child: Column(
++            crossAxisAlignment: CrossAxisAlignment.stretch,
++            children: [
++              TextFormField(
++                controller: _emailController,
++                decoration: const InputDecoration(labelText: 'Correo electrónico'),
++                keyboardType: TextInputType.emailAddress,
++                validator: (v) {
++                  if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
++                  final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
++                  if (!emailPattern.hasMatch(v.trim())) return 'Correo no válido';
++                  return null;
++                },
++              ),
++              const SizedBox(height: 16),
++              PrimaryButton(label: 'ENVIAR ENLACE', onPressed: _submit),
++            ],
++          ),
+         ),
+       ),
+     );
+diff --git a/lib/screens/auth/login_screen.dart b/lib/screens/auth/login_screen.dart
+index fdf1ac4..5afce0d 100644
+--- a/lib/screens/auth/login_screen.dart
++++ b/lib/screens/auth/login_screen.dart
+@@ -13,82 +13,110 @@ class LoginScreen extends StatefulWidget {
+ }
+ 
+ class _LoginScreenState extends State<LoginScreen> {
++  final _formKey = GlobalKey<FormState>();
++  final _usernameController = TextEditingController();
++  final _passwordController = TextEditingController();
+   bool _rememberMe = false;
+   bool _obscurePassword = true;
+ 
++  @override
++  void dispose() {
++    _usernameController.dispose();
++    _passwordController.dispose();
++    super.dispose();
++  }
++
++  void _autofill() {
++    _usernameController.text = 'usuario_demo';
++    _passwordController.text = 'Demo1234';
++  }
++
++  void _submit() {
++    if (_formKey.currentState!.validate()) {
++      // TODO: validar credenciales contra el backend real.
++      Navigator.pushReplacement(
++        context,
++        MaterialPageRoute(builder: (_) => const HomeScreen()),
++      );
++    }
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+       body: SafeArea(
+         child: Padding(
+           padding: const EdgeInsets.all(24),
+-          child: Column(
+-            crossAxisAlignment: CrossAxisAlignment.stretch,
+-            children: [
+-              const SizedBox(height: 24),
+-              const Text('Login', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+-              const SizedBox(height: 24),
+-              const TextField(
+-                decoration: InputDecoration(prefixIcon: Icon(Icons.person_outline), labelText: 'Username'),
+-              ),
+-              const SizedBox(height: 12),
+-              TextField(
+-                obscureText: _obscurePassword,
+-                decoration: InputDecoration(
+-                  prefixIcon: const Icon(Icons.lock_outline),
+-                  labelText: 'Password',
+-                  suffixIcon: IconButton(
+-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
++          child: Form(
++            key: _formKey,
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.stretch,
++              children: [
++                const SizedBox(height: 24),
++                const Text('Login', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
++                const SizedBox(height: 24),
++                TextFormField(
++                  controller: _usernameController,
++                  decoration: const InputDecoration(
++                    prefixIcon: Icon(Icons.person_outline),
++                    labelText: 'Username',
++                  ),
++                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa tu usuario' : null,
++                ),
++                const SizedBox(height: 12),
++                TextFormField(
++                  controller: _passwordController,
++                  obscureText: _obscurePassword,
++                  decoration: InputDecoration(
++                    prefixIcon: const Icon(Icons.lock_outline),
++                    labelText: 'Password',
++                    suffixIcon: IconButton(
++                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
++                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
++                    ),
+                   ),
++                  validator: (v) {
++                    if (v == null || v.isEmpty) return 'Ingresa tu contraseña';
++                    if (v.length < 6) return 'Debe tener al menos 6 caracteres';
++                    return null;
++                  },
+                 ),
+-              ),
+-              Align(
+-                alignment: Alignment.centerRight,
+-                child: TextButton(
+-                  onPressed: () => Navigator.push(
+-                    context,
+-                    MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
++                Align(
++                  alignment: Alignment.centerRight,
++                  child: TextButton(
++                    onPressed: () => Navigator.push(
++                      context,
++                      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
++                    ),
++                    child: const Text('¿Olvidaste tu contraseña?'),
+                   ),
+-                  child: const Text('¿Olvidaste tu contraseña?'),
+                 ),
+-              ),
+-              CheckboxListTile(
+-                value: _rememberMe,
+-                onChanged: (v) => setState(() => _rememberMe = v ?? false),
+-                title: const Text('Recordarme'),
+-                controlAffinity: ListTileControlAffinity.leading,
+-                contentPadding: EdgeInsets.zero,
+-              ),
+-              const SizedBox(height: 8),
+-              PrimaryButton(
+-                label: 'LOGIN',
+-                onPressed: () {
+-                  // TODO: validar credenciales contra el backend real.
+-                  Navigator.pushReplacement(
+-                    context,
+-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
+-                  );
+-                },
+-              ),
+-              const SizedBox(height: 16),
+-              OutlinedButton(
+-                onPressed: () {
+-                  // TODO: req. 2 — autocompletar datos de prueba.
+-                },
+-                child: const Text('Autocompletar datos'),
+-              ),
+-              const Spacer(),
+-              Center(
+-                child: TextButton(
+-                  onPressed: () => Navigator.push(
+-                    context,
+-                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
++                CheckboxListTile(
++                  value: _rememberMe,
++                  onChanged: (v) => setState(() => _rememberMe = v ?? false),
++                  title: const Text('Recordarme'),
++                  controlAffinity: ListTileControlAffinity.leading,
++                  contentPadding: EdgeInsets.zero,
++                ),
++                const SizedBox(height: 8),
++                PrimaryButton(label: 'LOGIN', onPressed: _submit),
++                const SizedBox(height: 16),
++                OutlinedButton(
++                  onPressed: _autofill, // req. 2 — autocompletar datos de prueba.
++                  child: const Text('Autocompletar datos'),
++                ),
++                const SizedBox(height: 24),
++                Center(
++                  child: TextButton(
++                    onPressed: () => Navigator.push(
++                      context,
++                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
++                    ),
++                    child: const Text('¿No tienes cuenta? Regístrate'),
+                   ),
+-                  child: const Text('¿No tienes cuenta? Regístrate'),
+                 ),
+-              ),
+-            ],
++              ],
++            ),
+           ),
+         ),
+       ),
+diff --git a/lib/screens/auth/register_screen.dart b/lib/screens/auth/register_screen.dart
+index 62c13e8..1d906f4 100644
+--- a/lib/screens/auth/register_screen.dart
++++ b/lib/screens/auth/register_screen.dart
+@@ -11,57 +11,94 @@ class RegisterScreen extends StatefulWidget {
+ }
+ 
+ class _RegisterScreenState extends State<RegisterScreen> {
++  final _formKey = GlobalKey<FormState>();
++  final _nameController = TextEditingController();
+   final _emailController = TextEditingController();
++  final _passwordController = TextEditingController();
++  final _confirmPasswordController = TextEditingController();
+   bool _acceptedTerms = false;
+ 
+   @override
+   void dispose() {
++    _nameController.dispose();
+     _emailController.dispose();
++    _passwordController.dispose();
++    _confirmPasswordController.dispose();
+     super.dispose();
+   }
+ 
++  void _submit() {
++    if (_formKey.currentState!.validate() && _acceptedTerms) {
++      // TODO: enviar el registro al backend.
++      Navigator.push(
++        context,
++        MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: _emailController.text)),
++      );
++    } else if (!_acceptedTerms) {
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('Debes autorizar el tratamiento de tus datos personales')),
++      );
++    }
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+       appBar: AppBar(title: const Text('Crear cuenta')),
+       body: Padding(
+         padding: const EdgeInsets.all(24),
+-        child: Column(
+-          crossAxisAlignment: CrossAxisAlignment.stretch,
+-          children: [
+-            const TextField(decoration: InputDecoration(labelText: 'Nombre completo')),
+-            const SizedBox(height: 12),
+-            TextField(
+-              controller: _emailController,
+-              decoration: const InputDecoration(labelText: 'Correo electrónico'),
+-              keyboardType: TextInputType.emailAddress,
+-            ),
+-            const SizedBox(height: 12),
+-            const TextField(decoration: InputDecoration(labelText: 'Contraseña'), obscureText: true),
+-            const SizedBox(height: 12),
+-            const TextField(decoration: InputDecoration(labelText: 'Confirmar contraseña'), obscureText: true),
+-            CheckboxListTile(
+-              value: _acceptedTerms,
+-              onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
+-              title: const Text('Autorizo el tratamiento de mis datos personales'),
+-              controlAffinity: ListTileControlAffinity.leading,
+-              contentPadding: EdgeInsets.zero,
+-            ),
+-            const SizedBox(height: 16),
+-            PrimaryButton(
+-              label: 'REGISTRARME',
+-              onPressed: _acceptedTerms
+-                  ? () {
+-                      // TODO: enviar el registro al backend.
+-                      final email = _emailController.text.isEmpty ? 'correo@ejemplo.com' : _emailController.text;
+-                      Navigator.push(
+-                        context,
+-                        MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: email)),
+-                      );
+-                    }
+-                  : null,
+-            ),
+-          ],
++        child: Form(
++          key: _formKey,
++          child: Column(
++            crossAxisAlignment: CrossAxisAlignment.stretch,
++            children: [
++              TextFormField(
++                controller: _nameController,
++                decoration: const InputDecoration(labelText: 'Nombre completo'),
++                validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa tu nombre' : null,
++              ),
++              const SizedBox(height: 12),
++              TextFormField(
++                controller: _emailController,
++                decoration: const InputDecoration(labelText: 'Correo electrónico'),
++                keyboardType: TextInputType.emailAddress,
++                validator: (v) {
++                  if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
++                  final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
++                  if (!emailPattern.hasMatch(v.trim())) return 'Correo no válido';
++                  return null;
++                },
++              ),
++              const SizedBox(height: 12),
++              TextFormField(
++                controller: _passwordController,
++                decoration: const InputDecoration(labelText: 'Contraseña'),
++                obscureText: true,
++                validator: (v) {
++                  if (v == null || v.isEmpty) return 'Ingresa una contraseña';
++                  if (v.length < 6) return 'Debe tener al menos 6 caracteres';
++                  return null;
++                },
++              ),
++              const SizedBox(height: 12),
++              TextFormField(
++                controller: _confirmPasswordController,
++                decoration: const InputDecoration(labelText: 'Confirmar contraseña'),
++                obscureText: true,
++                validator: (v) =>
++                    (v != _passwordController.text) ? 'Las contraseñas no coinciden' : null,
++              ),
++              CheckboxListTile(
++                value: _acceptedTerms,
++                onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
++                title: const Text('Autorizo el tratamiento de mis datos personales'),
++                controlAffinity: ListTileControlAffinity.leading,
++                contentPadding: EdgeInsets.zero,
++              ),
++              const SizedBox(height: 16),
++              PrimaryButton(label: 'REGISTRARME', onPressed: _submit),
++            ],
++          ),
+         ),
+       ),
+     );
+diff --git a/lib/screens/payments/add_payment_method_screen.dart b/lib/screens/payments/add_payment_method_screen.dart
+index 81fdf6c..2ec8f24 100644
+--- a/lib/screens/payments/add_payment_method_screen.dart
++++ b/lib/screens/payments/add_payment_method_screen.dart
+@@ -1,4 +1,5 @@
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
+ import '../../widgets/primary_button.dart';
+ 
+ /// Req. 11: formulario para agregar un nuevo método de pago.
+@@ -10,65 +11,111 @@ class AddPaymentMethodScreen extends StatefulWidget {
+ }
+ 
+ class _AddPaymentMethodScreenState extends State<AddPaymentMethodScreen> {
++  final _formKey = GlobalKey<FormState>();
++  final _cardNumberController = TextEditingController();
++  final _expiryController = TextEditingController();
++  final _cvvController = TextEditingController();
++  final _nameController = TextEditingController();
+   bool _saveAsDefault = true;
+ 
++  @override
++  void dispose() {
++    _cardNumberController.dispose();
++    _expiryController.dispose();
++    _cvvController.dispose();
++    _nameController.dispose();
++    super.dispose();
++  }
++
++  void _submit() {
++    if (_formKey.currentState!.validate()) {
++      // TODO: validar y enviar los datos de la tarjeta al backend de pagos.
++      ScaffoldMessenger.of(context).showSnackBar(
++        const SnackBar(content: Text('Método de pago guardado')),
++      );
++      Navigator.pop(context);
++    }
++  }
++
+   @override
+   Widget build(BuildContext context) {
+     return Scaffold(
+       appBar: AppBar(title: const Text('Agregar método')),
+       body: Padding(
+         padding: const EdgeInsets.all(24),
+-        child: Column(
+-          crossAxisAlignment: CrossAxisAlignment.stretch,
+-          children: [
+-            const TextField(
+-              decoration: InputDecoration(
+-                prefixIcon: Icon(Icons.credit_card),
+-                labelText: 'Número de tarjeta',
++        child: Form(
++          key: _formKey,
++          child: Column(
++            crossAxisAlignment: CrossAxisAlignment.stretch,
++            children: [
++              TextFormField(
++                controller: _cardNumberController,
++                decoration: const InputDecoration(
++                  prefixIcon: Icon(Icons.credit_card),
++                  labelText: 'Número de tarjeta',
++                ),
++                keyboardType: TextInputType.number,
++                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(16)],
++                validator: (v) =>
++                    (v == null || v.length != 16) ? 'Debe tener 16 dígitos' : null,
++              ),
++              const SizedBox(height: 12),
++              Row(
++                children: [
++                  Expanded(
++                    child: TextFormField(
++                      controller: _expiryController,
++                      decoration: const InputDecoration(labelText: 'MM/AA', hintText: '08/28'),
++                      inputFormatters: [LengthLimitingTextInputFormatter(5)],
++                      validator: (v) {
++                        final pattern = RegExp(r'^(0[1-9]|1[0-2])\/\d{2}$');
++                        return (v == null || !pattern.hasMatch(v)) ? 'Formato MM/AA' : null;
++                      },
++                    ),
++                  ),
++                  const SizedBox(width: 12),
++                  Expanded(
++                    child: TextFormField(
++                      controller: _cvvController,
++                      decoration: const InputDecoration(labelText: 'CVV'),
++                      keyboardType: TextInputType.number,
++                      obscureText: true,
++                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
++                      validator: (v) =>
++                          (v == null || v.length < 3) ? 'CVV inválido' : null,
++                    ),
++                  ),
++                ],
++              ),
++              const SizedBox(height: 12),
++              TextFormField(
++                controller: _nameController,
++                decoration: const InputDecoration(labelText: 'Nombre del titular'),
++                validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa el nombre del titular' : null,
++              ),
++              const SizedBox(height: 8),
++              CheckboxListTile(
++                value: _saveAsDefault,
++                onChanged: (v) => setState(() => _saveAsDefault = v ?? true),
++                title: const Text('Guardar como principal'),
++                controlAffinity: ListTileControlAffinity.leading,
++                contentPadding: EdgeInsets.zero,
++              ),
++              const SizedBox(height: 8),
++              const Text(
++                'Tus datos se guardan cifrados',
++                textAlign: TextAlign.center,
++                style: TextStyle(fontSize: 12, color: Colors.grey),
++              ),
++              const SizedBox(height: 24),
++              OutlinedButton(
++                onPressed: () => Navigator.pop(context),
++                child: const Text('Cancelar'),
+               ),
+-              keyboardType: TextInputType.number,
+-            ),
+-            const SizedBox(height: 12),
+-            Row(
+-              children: const [
+-                Expanded(child: TextField(decoration: InputDecoration(labelText: 'MM/AA'))),
+-                SizedBox(width: 12),
+-                Expanded(child: TextField(decoration: InputDecoration(labelText: 'CVV'))),
+-              ],
+-            ),
+-            const SizedBox(height: 12),
+-            const TextField(decoration: InputDecoration(labelText: 'Nombre del titular')),
+-            const SizedBox(height: 8),
+-            CheckboxListTile(
+-              value: _saveAsDefault,
+-              onChanged: (v) => setState(() => _saveAsDefault = v ?? true),
+-              title: const Text('Guardar como principal'),
+-              controlAffinity: ListTileControlAffinity.leading,
+-              contentPadding: EdgeInsets.zero,
+-            ),
+-            const SizedBox(height: 8),
+-            const Text(
+-              'Tus datos se guardan cifrados',
+-              textAlign: TextAlign.center,
+-              style: TextStyle(fontSize: 12, color: Colors.grey),
+-            ),
+-            const SizedBox(height: 24),
+-            OutlinedButton(
+-              onPressed: () => Navigator.pop(context),
+-              child: const Text('Cancelar'),
+-            ),
+-            const SizedBox(height: 12),
+-            PrimaryButton(
+-              label: 'GUARDAR MÉTODO',
+-              onPressed: () {
+-                // TODO: validar y enviar los datos de la tarjeta al backend de pagos.
+-                ScaffoldMessenger.of(context).showSnackBar(
+-                  const SnackBar(content: Text('Método de pago guardado')),
+-                );
+-                Navigator.pop(context);
+-              },
+-            ),
+-          ],
++              const SizedBox(height: 12),
++              PrimaryButton(label: 'GUARDAR MÉTODO', onPressed: _submit),
++            ],
++          ),
+         ),
+       ),
+     );
+-- 
+2.43.0
+

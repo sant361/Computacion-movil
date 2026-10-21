@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "618452627853",
+    "project_id": "streaming-app-e0850",
+    "storage_bucket": "streaming-app-e0850.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:618452627853:android:603a8b34539e7789a98dc4",
+        "android_client_info": {
+          "package_name": "com.example.streaming_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5OQ12JAHxdx4TmxxDTnB8lvrUP09bMVs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

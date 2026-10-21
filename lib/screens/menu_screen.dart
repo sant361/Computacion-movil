@@ -3,6 +3,7 @@ import 'catalog/profiles_screen.dart';
 import 'catalog/parental_control_screen.dart';
 import 'admin/admin_dashboard_screen.dart';
 import 'search_screen.dart';
+import '../state/app_state.dart';
 
 /// Req. 18, 38: categorías y tipos de contenido.
 class MenuScreen extends StatelessWidget {
@@ -41,11 +42,17 @@ class MenuScreen extends StatelessWidget {
             ],
           ),
           const Divider(height: 32),
-          ListTile(
-            leading: const Icon(Icons.people_outline),
-            title: const Text('Perfiles'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilesScreen())),
+          ListenableBuilder(
+            listenable: appState,
+            builder: (context, _) => ListTile(
+              leading: const Icon(Icons.people_outline),
+              title: const Text('Perfiles'),
+              subtitle: appState.activeProfile == null
+                  ? null
+                  : Text('Viendo como ${appState.activeProfile}'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilesScreen())),
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.shield_outlined),

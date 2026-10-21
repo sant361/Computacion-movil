@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -44,6 +45,7 @@ class _AppStartup extends StatelessWidget {
     await appState.load();
     if (appState.isLoggedIn) {
       await appState.loadCatalogFromFirestore();
+      await appState.loadProfiles(FirebaseAuth.instance.currentUser?.uid ?? 'local');
     }
   }
 

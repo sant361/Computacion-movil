@@ -36,6 +36,12 @@ class AppState extends ChangeNotifier {
   List<CatalogItem> _catalog = sampleCatalog;
   List<CatalogItem> get catalog => List.unmodifiable(_catalog);
 
+  String? _profileUserId;
+  List<String> _profiles = [];
+  List<String> get profiles => List.unmodifiable(_profiles);
+  String? _activeProfile;
+  String? get activeProfile => _activeProfile;
+
   bool _isLoggedIn = false;
   bool get isLoggedIn => _isLoggedIn;
 
@@ -113,6 +119,9 @@ class AppState extends ChangeNotifier {
     _isLoggedIn = false;
     _paymentUserId = null;
     _paymentMethods = [];
+    _profileUserId = null;
+    _profiles = [];
+    _activeProfile = null;
     notifyListeners();
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     await prefs.setBool(_isLoggedInKey, false);
@@ -270,6 +279,61 @@ class AppState extends ChangeNotifier {
       // Sin conexión o sin permisos: se mantiene el catálogo de muestra
       // local que ya estaba mostrando la app.
     }
+  }
+
+  String _profilesKey(String userId) => 'profiles:$userId';
+  String _activeProfileKey(String userId) => 'activeProfile:$userId';
+
+  /// Carga los perfiles guardados para [userId] (y cuál queda activo).
+  /// Si es la primera vez, crea los 3 perfiles de muestra de siempre
+  /// para que la pantalla no empiece vacía.
+  Future<void> loadProfiles(String userId) async {
+    _profileUserId = userId;
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    _profiles = prefs.getStringList(_profilesKey(userId)) ?? ['Ana', 'Luis', 'Kids'];
+    _activeProfile = prefs.getString(_activeProfileKey(userId)) ??
+        (_profiles.isNotEmpty ? _profiles.first : null);
+    notifyListeners();
+    await _persistProfiles();
+  }
+
+  Future<void> _persistProfiles() async {
+    final userId = _profileUserId;
+    if (userId == null) return;
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setStringList(_profilesKey(userId), _profiles);
+    final active = _activeProfile;
+    if (active != null) {
+      await prefs.setString(_activeProfileKey(userId), active);
+    }
+  }
+
+  /// Marca [name] como el perfil que se está usando ahora mismo.
+  Future<void> setActiveProfile(String name) async {
+    if (!_profiles.contains(name)) return;
+    _activeProfile = name;
+    notifyListeners();
+    await _persistProfiles();
+  }
+
+  /// Crea un perfil nuevo con [name] (se ignora si está vacío o repetido).
+  Future<void> addProfile(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || _profiles.contains(trimmed)) return;
+    _profiles.add(trimmed);
+    notifyListeners();
+    await _persistProfiles();
+  }
+
+  /// Elimina el perfil [name]. Si era el activo, el primero que quede
+  /// pasa a ser el nuevo activo.
+  Future<void> removeProfile(String name) async {
+    _profiles.remove(name);
+    if (_activeProfile == name) {
+      _activeProfile = _profiles.isNotEmpty ? _profiles.first : null;
+    }
+    notifyListeners();
+    await _persistProfiles();
   }
 }
 

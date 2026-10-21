@@ -9,8 +9,15 @@ import 'payments/subscription_screen.dart';
 import 'search_screen.dart';
 import 'tokens/tokens_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _selectedCategory = 'Todo';
 
   void _openItem(BuildContext context, CatalogItem item) {
     Navigator.push(
@@ -124,43 +131,43 @@ class HomeScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
-          _CategoryStrip(onSelected: (genre) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SearchScreen(
-                  initialGenre: genre == 'Todo' ? null : genre,
-                ),
-              ),
-            );
-          }),
+          _CategoryStrip(
+            selected: _selectedCategory,
+            onSelected: (genre) => setState(() => _selectedCategory = genre),
+          ),
           const SizedBox(height: 16),
-          if (featuredItem != null) ...[
-            _FeaturedCard(item: featuredItem, onTap: () {
-              _openItem(context, featuredItem);
-            }),
-            const SizedBox(height: 28),
-          ],
-          _PosterSection(
-            title: 'Series que podrían gustarte',
-            action: 'Ver todo',
-            items: featured,
-            onItemTap: (item) => _openItem(context, item),
-            onActionTap: () => _openSearch(context),
-          ),
-          const SizedBox(height: 12),
-          _ContinueWatchingSection(
-            items: continueWatching,
-            onItemTap: (item) => _openItem(context, item),
-          ),
-          const SizedBox(height: 12),
-          _PosterSection(
-            title: 'Elegidas para ti',
-            action: 'Explorar',
-            items: recommended,
-            onItemTap: (item) => _openItem(context, item),
-            onActionTap: () => _openSearch(context),
-          ),
+          if (_selectedCategory == 'Todo') ...[
+            if (featuredItem != null) ...[
+              _FeaturedCard(item: featuredItem, onTap: () {
+                _openItem(context, featuredItem);
+              }),
+              const SizedBox(height: 28),
+            ],
+            _PosterSection(
+              title: 'Series que podrían gustarte',
+              action: 'Ver todo',
+              items: featured,
+              onItemTap: (item) => _openItem(context, item),
+              onActionTap: () => _openSearch(context),
+            ),
+            const SizedBox(height: 12),
+            _ContinueWatchingSection(
+              items: continueWatching,
+              onItemTap: (item) => _openItem(context, item),
+            ),
+            const SizedBox(height: 12),
+            _PosterSection(
+              title: 'Elegidas para ti',
+              action: 'Explorar',
+              items: recommended,
+              onItemTap: (item) => _openItem(context, item),
+              onActionTap: () => _openSearch(context),
+            ),
+          ] else
+            _CategoryGrid(
+              items: catalog.where((item) => item.genre == _selectedCategory).toList(),
+              onItemTap: (item) => _openItem(context, item),
+            ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -207,8 +214,9 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _CategoryStrip extends StatelessWidget {
-  const _CategoryStrip({required this.onSelected});
+  const _CategoryStrip({required this.selected, required this.onSelected});
 
+  final String selected;
   final ValueChanged<String> onSelected;
   static const _categories = [
     'Todo',
@@ -230,14 +238,14 @@ class _CategoryStrip extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 9),
         itemBuilder: (_, index) {
           final category = _categories[index];
-          final isAll = index == 0;
+          final isSelected = category == selected;
           return ChoiceChip(
             label: Text(category),
-            selected: isAll,
+            selected: isSelected,
             showCheckmark: false,
             onSelected: (_) => onSelected(category),
             labelStyle: TextStyle(
-              color: isAll ? const Color(0xFF07111F) : Colors.white70,
+              color: isSelected ? const Color(0xFF07111F) : Colors.white70,
               fontWeight: FontWeight.w600,
             ),
             selectedColor: const Color(0xFF35D0C4),
@@ -649,6 +657,86 @@ class _ContinueWatchingSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Resultados al tocar una categoría arriba de Inicio (Acción, Comedia...):
+/// filtra ahí mismo en vez de llevar a otra pantalla.
+class _CategoryGrid extends StatelessWidget {
+  const _CategoryGrid({required this.items, required this.onItemTap});
+
+  final List<CatalogItem> items;
+  final ValueChanged<CatalogItem> onItemTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(
+          child: Text(
+            'No hay contenido en esta categoría todavía',
+            style: TextStyle(color: Colors.white54),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.78,
+        ),
+        itemBuilder: (_, index) {
+          final item = items[index];
+          final colors = _genreColors(item.genre);
+          return InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => onItemTap(item),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: colors,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 36),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${item.genre}  ·  ${item.year}',
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

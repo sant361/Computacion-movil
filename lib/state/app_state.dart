@@ -260,25 +260,64 @@ class AppState extends ChangeNotifier {
             'title': item.title,
             'genre': item.genre,
             'year': item.year,
+            'language': item.language,
+            'durationMinutes': item.durationMinutes,
           });
         }
         await batch.commit();
         _catalog = sampleCatalog;
       } else {
-        _catalog = snapshot.docs.map((doc) {
+        // Si el catálogo se sembró antes de agregar idioma/duración,
+        // a los documentos viejos les completamos esos campos aquí
+        // mismo (una sola vez) para que el filtro funcione con todo.
+        final backfill = FirebaseFirestore.instance.batch();
+        var needsBackfill = false;
+        _catalog = snapshot.docs.asMap().entries.map((entry) {
+          final index = entry.key;
+          final doc = entry.value;
           final data = doc.data();
+          final genre = data['genre'] as String? ?? '';
+          var language = data['language'] as String?;
+          var duration = (data['durationMinutes'] as num?)?.toInt();
+          if (language == null || duration == null) {
+            language ??= _defaultLanguageFor(index);
+            duration ??= _defaultDurationFor(genre, index);
+            backfill.update(doc.reference, {'language': language, 'durationMinutes': duration});
+            needsBackfill = true;
+          }
           return CatalogItem(
             title: data['title'] as String? ?? '',
-            genre: data['genre'] as String? ?? '',
+            genre: genre,
             year: (data['year'] as num?)?.toInt() ?? 0,
+            language: language,
+            durationMinutes: duration,
           );
         }).toList();
+        if (needsBackfill) {
+          await backfill.commit();
+        }
       }
       notifyListeners();
     } catch (_) {
       // Sin conexión o sin permisos: se mantiene el catálogo de muestra
       // local que ya estaba mostrando la app.
     }
+  }
+
+  static const _languageCycle = ['Español', 'Inglés', 'Francés'];
+  static const _durationRangeByGenre = {
+    'Comedia': [85, 100],
+    'Suspenso': [105, 130],
+    'Acción': [100, 135],
+    'Infantil': [45, 65],
+    'Romance': [90, 110],
+  };
+
+  String _defaultLanguageFor(int index) => _languageCycle[index % _languageCycle.length];
+
+  int _defaultDurationFor(String genre, int index) {
+    final range = _durationRangeByGenre[genre] ?? [80, 110];
+    return range[0] + ((index * 7) % (range[1] - range[0] + 1));
   }
 
   String _profilesKey(String userId) => 'profiles:$userId';

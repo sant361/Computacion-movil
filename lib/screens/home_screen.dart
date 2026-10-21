@@ -61,17 +61,18 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Row(
           children: [
             Text(
-              'MF',
+              '+',
               style: TextStyle(
+                color: Color(0xFFFC093F),
                 fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
+                fontSize: 20,
               ),
             ),
             Text(
-              '+',
+              'Wnovelas',
               style: TextStyle(
-                color: Color(0xFF35D0C4),
                 fontWeight: FontWeight.w800,
+                letterSpacing: 0.4,
               ),
             ),
           ],
@@ -334,13 +335,13 @@ class _FeaturedCard extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF35D0C4),
+                          color: const Color(0xFFFC093F),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Text(
-                          'MF+ ORIGINAL',
+                          '+WNOVELAS ORIGINAL',
                           style: TextStyle(
-                            color: Color(0xFF07111F),
+                            color: Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1,
@@ -503,7 +504,7 @@ class _PosterSection extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Text(
-                                    'MF+',
+                                    '+W',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 9,

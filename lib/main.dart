@@ -25,7 +25,7 @@ class StreamingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MF+',
+      title: '+Wnovelas',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF3D5A80),

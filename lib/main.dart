@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
@@ -9,7 +10,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // firebase_options.dart lo genera "flutterfire configure" automáticamente
   // con los datos de TU proyecto de Firebase; no se edita a mano.
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (!kIsWeb || !const bool.fromEnvironment('DEMO_AUTH_ENABLED')) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
   runApp(const StreamingApp());
 }
 
@@ -19,7 +24,7 @@ class StreamingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Streaming App',
+      title: 'MF+',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorSchemeSeed: const Color(0xFF3D5A80),

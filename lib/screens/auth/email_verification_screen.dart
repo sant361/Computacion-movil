@@ -14,8 +14,6 @@ class EmailVerificationScreen extends StatefulWidget {
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
 
-  String get _code => _controllers.map((c) => c.text).join();
-
   @override
   void dispose() {
     for (final c in _controllers) {

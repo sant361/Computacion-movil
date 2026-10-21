@@ -34,7 +34,9 @@ class UsersRolesScreen extends StatelessWidget {
               trailing: Chip(
                 label: Text(u['estado'] as String),
                 backgroundColor:
-                    (u['activo'] as bool) ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                    (u['activo'] as bool)
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
                 labelStyle: TextStyle(color: (u['activo'] as bool) ? Colors.green : Colors.red),
               ),
             ),

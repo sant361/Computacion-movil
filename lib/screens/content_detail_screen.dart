@@ -31,9 +31,9 @@ class ContentDetailScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 const Text('2026 · 3 temporadas · +14', style: TextStyle(color: Colors.grey)),
                 const SizedBox(height: 8),
-                Wrap(
+                const Wrap(
                   spacing: 8,
-                  children: const [
+                  children: [
                     Chip(label: Text('Drama')),
                     Chip(label: Text('Suspenso')),
                     Chip(label: Text('Acción')),

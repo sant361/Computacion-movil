@@ -44,7 +44,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
           Row(
             children: [
-              Expanded(child: TextField(decoration: InputDecoration(hintText: 'Código promocional'))),
+              const Expanded(child: TextField(decoration: InputDecoration(hintText: 'Código promocional'))),
               const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(

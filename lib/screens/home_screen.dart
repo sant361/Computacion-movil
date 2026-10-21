@@ -286,7 +286,7 @@ class _FeaturedCard extends StatelessWidget {
                     height: 245,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF65D5C4).withOpacity(0.16),
+                      color: const Color(0xFF65D5C4).withValues(alpha: 0.16),
                     ),
                   ),
                 ),
@@ -376,7 +376,7 @@ class _FeaturedCard extends StatelessWidget {
                             onPressed: onTap,
                             style: IconButton.styleFrom(
                               foregroundColor: Colors.white,
-                              backgroundColor: Colors.white.withOpacity(0.16),
+                              backgroundColor: Colors.white.withValues(alpha: 0.16),
                             ),
                             icon: const Icon(Icons.add_rounded),
                           ),
@@ -482,7 +482,7 @@ class _PosterSection extends StatelessWidget {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.35),
+                                    color: Colors.black.withValues(alpha: 0.35),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Text(

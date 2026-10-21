@@ -26,11 +26,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
+          const Card(
             child: ListTile(
-              title: const Text('Estándar', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Renueva el 00/00/0000'),
-              trailing: const Text('\$00.000/mes'),
+              title: Text('Estándar', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Renueva el 00/00/0000'),
+              trailing: Text('\$00.000/mes'),
             ),
           ),
           SwitchListTile(
@@ -81,7 +81,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           ListTile(
             title: const Text('Métodos de pago'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentMethodsScreen())),
+            onTap: () async {
+              await appState.loadPaymentMethods(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+              if (!context.mounted) return;
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()));
+            },
           ),
           ListTile(
             title: const Text('Facturación'),

@@ -44,8 +44,8 @@ class EarnTokensScreen extends StatelessWidget {
               child: const Text('VER ANUNCIO'),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: const [
+            const Row(
+              children: [
                 Expanded(child: Divider()),
                 Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('o', style: TextStyle(color: Colors.grey))),
                 Expanded(child: Divider()),

@@ -32,9 +32,9 @@ class MenuScreen extends StatelessWidget {
           const SizedBox(height: 8),
           const Text('Tipo', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Wrap(
+          const Wrap(
             spacing: 8,
-            children: const [
+            children: [
               Chip(label: Text('Películas')),
               Chip(label: Text('Series')),
               Chip(label: Text('Documentales')),

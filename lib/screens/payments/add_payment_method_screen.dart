@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../state/app_state.dart';
 import '../../widgets/primary_button.dart';
 
 /// Req. 11: formulario para agregar un nuevo método de pago.
@@ -27,9 +28,25 @@ class _AddPaymentMethodScreenState extends State<AddPaymentMethodScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  /// Identifica la marca de la tarjeta por su primer dígito, solo para
+  /// mostrarla en pantalla (no hay cobro ni validación real con un banco).
+  String _brandFromCardNumber(String cardNumber) {
+    if (cardNumber.startsWith('4')) return 'Visa';
+    if (cardNumber.startsWith('5')) return 'Mastercard';
+    return 'Tarjeta';
+  }
+
+  Future<void> _submit() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: validar y enviar los datos de la tarjeta al backend de pagos.
+      final cardNumber = _cardNumberController.text;
+      await appState.addPaymentMethod(
+        last4: cardNumber.substring(cardNumber.length - 4),
+        brand: _brandFromCardNumber(cardNumber),
+        expiry: _expiryController.text,
+        holder: _nameController.text.trim(),
+        isDefault: _saveAsDefault,
+      );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Método de pago guardado')),
       );

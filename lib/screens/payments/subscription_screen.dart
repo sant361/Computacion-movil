@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -31,6 +32,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const _demoAuthEnabled = bool.fromEnvironment('DEMO_AUTH_ENABLED');
 
   bool _autoRenew = true;
+  bool _savingName = false;
   Uint8List? _avatarBytes;
 
   User? get _user =>
@@ -39,14 +41,83 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String get _photoKey =>
       'account_photo:${_user?.uid ?? 'local'}:${appState.activeProfile ?? 'account'}';
 
-  String get _displayName {
-    final profile = appState.activeProfile?.trim();
-    if (profile != null && profile.isNotEmpty) return profile;
+  String get _displayEmail {
     final name = _user?.displayName?.trim();
     if (name != null && name.isNotEmpty) return name;
-    final email = _user?.email;
-    if (email != null && email.isNotEmpty) return email.split('@').first;
-    return _demoAuthEnabled ? 'Usuario demo' : 'Mi perfil';
+    final email = _user?.email?.trim();
+    if (email != null && email.isNotEmpty) return email;
+    return _demoAuthEnabled ? 'Usuario demo' : 'Correo no disponible';
+  }
+
+  Future<void> _editName() async {
+    final user = _user;
+    if (user == null || _savingName) return;
+    var editedName = user.displayName ?? '';
+    final formKey = GlobalKey<FormState>();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Editar nombre'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            initialValue: editedName,
+            onChanged: (value) => editedName = value,
+            autofocus: true,
+            maxLength: 30,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                  RegExp(r'[\p{L}\p{M} ]', unicode: true)),
+            ],
+            decoration: const InputDecoration(
+              labelText: 'Nombre',
+              helperText: 'Solo letras y espacios',
+            ),
+            validator: (value) {
+              final name = value?.trim() ?? '';
+              if (name.isEmpty) return 'Escribe un nombre';
+              if (name.characters.length > 30 ||
+                  !RegExp(r'^[\p{L}][\p{L}\p{M} ]*$', unicode: true)
+                      .hasMatch(name)) {
+                return 'Usa solo letras y espacios (máximo 30)';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, editedName.trim());
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || !mounted) return;
+    setState(() => _savingName = true);
+    try {
+      await user.updateDisplayName(name);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nombre actualizado')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo guardar el nombre. Intenta de nuevo.')),
+      );
+    } finally {
+      if (mounted) setState(() => _savingName = false);
+    }
   }
 
   @override
@@ -259,13 +330,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_displayName,
+                      Text(_displayEmail,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                               color: Colors.white,
                               fontSize: 20,
                               fontWeight: FontWeight.w800)),
+                      TextButton.icon(
+                        onPressed: _savingName || _user == null ? null : _editName,
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        label: Text(_savingName ? 'Guardando...' : 'Editar nombre'),
+                        style: TextButton.styleFrom(foregroundColor: _accent),
+                      ),
                       const SizedBox(height: 5),
                       const Text('Plan Estándar',
                           style: TextStyle(

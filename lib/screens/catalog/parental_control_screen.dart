@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../data/catalog_item.dart';
+import '../../state/app_state.dart';
 
 /// Req. 41: control parental y clasificación máxima de contenido.
 class ParentalControlScreen extends StatefulWidget {
@@ -9,10 +12,30 @@ class ParentalControlScreen extends StatefulWidget {
 }
 
 class _ParentalControlScreenState extends State<ParentalControlScreen> {
-  String _maxRating = '+14';
-  bool _restrictByProfile = true;
-  bool _blockPurchases = false;
-  final _pinController = TextEditingController();
+  late String _maxRating = appState.parentalMaxRating;
+  late bool _restrictByProfile = appState.parentalRestrictByProfile;
+  late bool _blockPurchases = appState.parentalBlockPurchases;
+  late final _pinController = TextEditingController(text: appState.parentalPin);
+
+  Future<void> _save() async {
+    final pin = _pinController.text;
+    if (pin.isNotEmpty && pin.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El PIN debe tener 4 dígitos (o déjalo vacío)')),
+      );
+      return;
+    }
+    await appState.saveParentalSettings(
+      maxRating: _maxRating,
+      restrictByProfile: _restrictByProfile,
+      blockPurchases: _blockPurchases,
+      pin: pin,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Control parental actualizado')),
+    );
+  }
 
   @override
   void dispose() {
@@ -31,7 +54,7 @@ class _ParentalControlScreenState extends State<ParentalControlScreen> {
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            children: ['TP', '+14', '+18'].map((r) {
+            children: parentalRatings.map((r) {
               return ChoiceChip(
                 label: Text(r),
                 selected: _maxRating == r,
@@ -46,6 +69,7 @@ class _ParentalControlScreenState extends State<ParentalControlScreen> {
             controller: _pinController,
             obscureText: true,
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             maxLength: 4,
             decoration: const InputDecoration(hintText: '••••'),
           ),
@@ -66,12 +90,7 @@ class _ParentalControlScreenState extends State<ParentalControlScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
-                // TODO: guardar configuración en el backend.
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Control parental actualizado')),
-                );
-              },
+              onPressed: _save,
               child: const Text('GUARDAR CAMBIOS'),
             ),
           ),

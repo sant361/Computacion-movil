@@ -13,7 +13,19 @@ class CatalogItem {
     this.language = 'Español',
     this.durationMinutes = 90,
   });
+
+  /// Clasificación por edad, derivada del género (el catálogo no guarda una
+  /// clasificación propia). Un género desconocido se trata como el más
+  /// restrictivo, para que el control parental nunca deje pasar de más.
+  String get rating => switch (genre) {
+        'Infantil' || 'Comedia' => 'TP',
+        'Romance' || 'Acción' => '+14',
+        _ => '+18',
+      };
 }
+
+/// Clasificaciones de menor a mayor restricción.
+const List<String> parentalRatings = ['TP', '+14', '+18'];
 const List<CatalogItem> sampleCatalog = [
   CatalogItem(title: 'Risas en el aire', genre: 'Comedia', year: 2024, language: 'Español', durationMinutes: 85),
   CatalogItem(title: 'La última broma', genre: 'Comedia', year: 2022, language: 'Inglés', durationMinutes: 92),

@@ -34,7 +34,25 @@ class AppState extends ChangeNotifier {
   // Mientras se carga desde Firestore (o si falla la conexión), la app
   // muestra este catálogo de muestra para que nunca se vea vacía.
   List<CatalogItem> _catalog = sampleCatalog;
-  List<CatalogItem> get catalog => List.unmodifiable(_catalog);
+  /// Catálogo visible: ya sin lo que supere la clasificación máxima del
+  /// control parental.
+  List<CatalogItem> get catalog {
+    final limit = parentalRatings.indexOf(_parentalMaxRating);
+    return List.unmodifiable(
+      _catalog.where((item) => parentalRatings.indexOf(item.rating) <= limit),
+    );
+  }
+
+  // Control parental (se guarda por cuenta, igual que los perfiles).
+  String? _parentalUserId;
+  String _parentalMaxRating = '+18';
+  bool _parentalRestrictByProfile = true;
+  bool _parentalBlockPurchases = false;
+  String _parentalPin = '';
+  String get parentalMaxRating => _parentalMaxRating;
+  bool get parentalRestrictByProfile => _parentalRestrictByProfile;
+  bool get parentalBlockPurchases => _parentalBlockPurchases;
+  String get parentalPin => _parentalPin;
 
   String? _profileUserId;
   List<String> _profiles = [];
@@ -122,6 +140,11 @@ class AppState extends ChangeNotifier {
     _profileUserId = null;
     _profiles = [];
     _activeProfile = null;
+    _parentalUserId = null;
+    _parentalMaxRating = '+18';
+    _parentalRestrictByProfile = true;
+    _parentalBlockPurchases = false;
+    _parentalPin = '';
     notifyListeners();
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     await prefs.setBool(_isLoggedInKey, false);
@@ -334,6 +357,60 @@ class AppState extends ChangeNotifier {
         (_profiles.isNotEmpty ? _profiles.first : null);
     notifyListeners();
     await _persistProfiles();
+  }
+
+  String _parentalKey(String userId) => 'parental:$userId';
+
+  /// Carga la configuración de control parental de esta cuenta.
+  Future<void> loadParentalSettings(String userId) async {
+    _parentalUserId = userId;
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final raw = prefs.getString(_parentalKey(userId));
+    _parentalMaxRating = '+18';
+    _parentalRestrictByProfile = true;
+    _parentalBlockPurchases = false;
+    _parentalPin = '';
+    if (raw != null) {
+      try {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        final rating = data['maxRating'] as String?;
+        if (rating != null && parentalRatings.contains(rating)) {
+          _parentalMaxRating = rating;
+        }
+        _parentalRestrictByProfile = data['restrictByProfile'] as bool? ?? true;
+        _parentalBlockPurchases = data['blockPurchases'] as bool? ?? false;
+        _parentalPin = data['pin'] as String? ?? '';
+      } catch (_) {
+        // Un dato guardado dañado no debe impedir abrir la app.
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Guarda la configuración de control parental y la aplica de inmediato.
+  Future<void> saveParentalSettings({
+    required String maxRating,
+    required bool restrictByProfile,
+    required bool blockPurchases,
+    required String pin,
+  }) async {
+    _parentalMaxRating = maxRating;
+    _parentalRestrictByProfile = restrictByProfile;
+    _parentalBlockPurchases = blockPurchases;
+    _parentalPin = pin;
+    notifyListeners();
+    final userId = _parentalUserId;
+    if (userId == null) return;
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setString(
+      _parentalKey(userId),
+      jsonEncode({
+        'maxRating': maxRating,
+        'restrictByProfile': restrictByProfile,
+        'blockPurchases': blockPurchases,
+        'pin': pin,
+      }),
+    );
   }
 
   Future<void> _persistProfiles() async {

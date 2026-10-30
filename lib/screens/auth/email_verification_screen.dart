@@ -48,6 +48,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       await appState.login();
       await appState.loadCatalogFromFirestore();
       await appState.loadProfiles(fresh.uid);
+      await appState.loadParentalSettings(fresh.uid);
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,

@@ -14,6 +14,12 @@ class ContentPanelScreen extends StatelessWidget {
   ];
 
   Future<void> _addContent(BuildContext context) async {
+    if (!appState.isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Solo los administradores pueden agregar contenido.')),
+      );
+      return;
+    }
     final item = await showDialog<CatalogItem>(
       context: context,
       builder: (_) => const _NewContentDialog(),

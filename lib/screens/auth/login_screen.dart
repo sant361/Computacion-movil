@@ -94,6 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await appState.loadCatalogFromFirestore();
       await appState.loadProfiles(FirebaseAuth.instance.currentUser?.uid ?? 'local');
       await appState.loadParentalSettings(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      await appState.loadAdminStatus(FirebaseAuth.instance.currentUser?.uid ?? 'local');
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

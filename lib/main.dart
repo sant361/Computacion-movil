@@ -47,6 +47,7 @@ class _AppStartup extends StatelessWidget {
       await appState.loadCatalogFromFirestore();
       await appState.loadProfiles(FirebaseAuth.instance.currentUser?.uid ?? 'local');
       await appState.loadParentalSettings(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      await appState.loadAdminStatus(FirebaseAuth.instance.currentUser?.uid ?? 'local');
     }
   }
 

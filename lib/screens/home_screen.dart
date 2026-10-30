@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../data/catalog_item.dart';
 import '../state/app_state.dart';
 import 'catalog/downloads_screen.dart';
@@ -22,9 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openItem(BuildContext context, CatalogItem item) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ContentDetailScreen(title: item.title),
-      ),
+      MaterialPageRoute(builder: (_) => ContentDetailScreen(title: item.title)),
     );
   }
 
@@ -50,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final featured = catalog.take(8).toList();
     final continueWatching = catalog.skip(5).take(4).toList();
     final recommended = catalog.reversed.take(8).toList();
-    final featuredItem = catalog.isEmpty ? null : catalog[20 % catalog.length];
+    final featuredItems = catalog.take(5).toList();
 
     return Scaffold(
       backgroundColor: background,
@@ -68,11 +67,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontSize: 20,
               ),
             ),
-            Text(
-              'Wnovelas',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.4,
+            Flexible(
+              child: Text(
+                'Wnovelas',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                ),
               ),
             ),
           ],
@@ -87,9 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: 'Descargas',
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const DownloadsScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const DownloadsScreen()),
             ),
             icon: const Icon(Icons.download_for_offline_outlined),
           ),
@@ -138,12 +139,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
           if (_selectedCategory == 'Todo') ...[
-            if (featuredItem != null) ...[
-              _FeaturedCard(item: featuredItem, onTap: () {
-                _openItem(context, featuredItem);
-              }),
-              const SizedBox(height: 28),
-            ],
+            _FeaturedCarousel(
+              key: ValueKey(
+                Object.hashAll(
+                  featuredItems.map(
+                    (item) => Object.hash(item.title, item.genre, item.year),
+                  ),
+                ),
+              ),
+              items: featuredItems,
+              onItemTap: (item) => _openItem(context, item),
+            ),
+            const SizedBox(height: 28),
             _PosterSection(
               title: 'Series que podrían gustarte',
               action: 'Ver todo',
@@ -166,7 +173,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ] else
             _CategoryGrid(
-              items: catalog.where((item) => item.genre == _selectedCategory).toList(),
+              items: catalog
+                  .where((item) => item.genre == _selectedCategory)
+                  .toList(),
               onItemTap: (item) => _openItem(context, item),
             ),
         ],
@@ -203,10 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _ => null,
           };
           if (screen != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => screen),
-            );
+            Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
           }
         },
       ),
@@ -256,6 +262,130 @@ class _CategoryStrip extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _FeaturedCarousel extends StatefulWidget {
+  const _FeaturedCarousel({
+    super.key,
+    required this.items,
+    required this.onItemTap,
+  });
+
+  final List<CatalogItem> items;
+  final ValueChanged<CatalogItem> onItemTap;
+
+  @override
+  State<_FeaturedCarousel> createState() => _FeaturedCarouselState();
+}
+
+class _FeaturedCarouselState extends State<_FeaturedCarousel> {
+  final _controller = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _goTo(int page) {
+    if (!_controller.hasClients || page < 0 || page >= widget.items.length) {
+      return;
+    }
+    _controller.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Text(
+          'No hay títulos disponibles por ahora.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white70),
+        ),
+      );
+    }
+    final multiple = widget.items.length > 1;
+    // La navegación es manual: ningún temporizador interrumpe al usuario.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showArrows = multiple && constraints.maxWidth >= 600;
+        return Column(
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height < 600 ? 280 : 390,
+              child: PageView.builder(
+                controller: _controller,
+                itemCount: widget.items.length,
+                physics: multiple ? null : const NeverScrollableScrollPhysics(),
+                onPageChanged: (page) => setState(() => _page = page),
+                itemBuilder: (context, index) {
+                  final item = widget.items[index];
+                  return _FeaturedCard(
+                    item: item,
+                    onTap: () => widget.onItemTap(item),
+                  );
+                },
+              ),
+            ),
+            if (multiple)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (showArrows)
+                    IconButton(
+                      tooltip: 'Título anterior',
+                      color: Colors.white,
+                      disabledColor: Colors.white24,
+                      onPressed: _page > 0 ? () => _goTo(_page - 1) : null,
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                  Flexible(
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      children: List.generate(
+                        widget.items.length,
+                        (index) => Semantics(
+                          selected: index == _page,
+                          child: IconButton(
+                            tooltip:
+                                'Ver título ${index + 1} de ${widget.items.length}',
+                            onPressed: () => _goTo(index),
+                            icon: Icon(
+                              Icons.circle,
+                              size: index == _page ? 12 : 8,
+                            ),
+                            color: index == _page
+                                ? const Color(0xFF35D0C4)
+                                : Colors.white38,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (showArrows)
+                    IconButton(
+                      tooltip: 'Título siguiente',
+                      color: Colors.white,
+                      disabledColor: Colors.white24,
+                      onPressed: _page < widget.items.length - 1
+                          ? () => _goTo(_page + 1)
+                          : null,
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                ],
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -325,82 +455,94 @@ class _FeaturedCard extends StatelessWidget {
                 Positioned(
                   left: 22,
                   right: 22,
+                  top: 22,
                   bottom: 22,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFC093F),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          '+WNOVELAS ORIGINAL',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          height: 1.05,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 9),
-                      Text(
-                        '${item.year}  ·  ${item.genre}  ·  Serie',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          FilledButton.icon(
-                            onPressed: onTap,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF07111F),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 12,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFC093F),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              '+WNOVELAS ORIGINAL',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
                               ),
                             ),
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            label: const Text(
-                              'Reproducir',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            item.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                              height: 1.05,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          IconButton.filledTonal(
-                            tooltip: 'Ver detalles',
-                            onPressed: onTap,
-                            style: IconButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              backgroundColor: Colors.white.withValues(alpha: 0.16),
+                          const SizedBox(height: 9),
+                          Text(
+                            '${item.year}  ·  ${item.genre}  ·  Serie',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
-                            icon: const Icon(Icons.add_rounded),
+                          ),
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 8,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: onTap,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: const Color(0xFF07111F),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                icon: const Icon(Icons.play_arrow_rounded),
+                                label: const Text(
+                                  'Reproducir',
+                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              IconButton.filledTonal(
+                                tooltip: 'Ver detalles',
+                                onPressed: onTap,
+                                style: IconButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  backgroundColor: Colors.white.withValues(
+                                    alpha: 0.16,
+                                  ),
+                                ),
+                                icon: const Icon(Icons.add_rounded),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -716,7 +858,11 @@ class _CategoryGrid extends StatelessWidget {
                         ),
                       ),
                       child: const Center(
-                        child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 36),
+                        child: Icon(
+                          Icons.play_circle_fill_rounded,
+                          color: Colors.white,
+                          size: 36,
+                        ),
                       ),
                     ),
                   ),
@@ -726,7 +872,11 @@ class _CategoryGrid extends StatelessWidget {
                   item.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(

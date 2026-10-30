@@ -1,8 +1,15 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../state/app_state.dart';
 import '../../widgets/primary_button.dart';
 import '../home_screen.dart';
 
-/// Req. 6: verificación de correo con código de 6 dígitos.
+/// Req. 6: verificación de correo.
+///
+/// Firebase no envía un código de 6 dígitos: envía un enlace al correo. La
+/// persona abre el enlace (en cualquier dispositivo), vuelve a la app y toca
+/// "YA VERIFIQUÉ MI CORREO"; aquí se consulta a Firebase si ya quedó verificado.
 class EmailVerificationScreen extends StatefulWidget {
   final String email;
   const EmailVerificationScreen({super.key, required this.email});
@@ -12,14 +19,67 @@ class EmailVerificationScreen extends StatefulWidget {
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  static const _demoAuthEnabled = bool.fromEnvironment('DEMO_AUTH_ENABLED');
 
-  @override
-  void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
+  bool _checking = false;
+  bool _resending = false;
+
+  User? get _user => kIsWeb && _demoAuthEnabled ? null : FirebaseAuth.instance.currentUser;
+
+  void _showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _checkVerified() async {
+    final user = _user;
+    if (user == null) {
+      _showMessage('No hay una sesión activa. Vuelve a iniciar sesión.');
+      return;
     }
-    super.dispose();
+    setState(() => _checking = true);
+    try {
+      await user.reload();
+      final fresh = FirebaseAuth.instance.currentUser;
+      if (fresh == null || !fresh.emailVerified) {
+        _showMessage('Todavía no vemos tu correo verificado. Abre el enlace del correo y vuelve a intentar.');
+        return;
+      }
+      await appState.login();
+      await appState.loadCatalogFromFirestore();
+      await appState.loadProfiles(fresh.uid);
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
+    } on FirebaseAuthException {
+      _showMessage('No se pudo comprobar la verificación. Intenta de nuevo.');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _resend() async {
+    final user = _user;
+    if (user == null) {
+      _showMessage('No hay una sesión activa. Vuelve a iniciar sesión.');
+      return;
+    }
+    setState(() => _resending = true);
+    try {
+      await user.sendEmailVerification();
+      _showMessage('Te enviamos un nuevo enlace de verificación');
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'too-many-requests') {
+        _showMessage('Espera un momento antes de pedir otro correo.');
+      } else {
+        _showMessage('No se pudo reenviar el correo. Intenta de nuevo.');
+      }
+    } finally {
+      if (mounted) setState(() => _resending = false);
+    }
   }
 
   @override
@@ -35,52 +95,22 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               const SizedBox(height: 16),
               const Text('Verifica tu correo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Enviamos un código a ${widget.email}', textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(
-                  6,
-                  (i) => SizedBox(
-                    width: 42,
-                    child: TextField(
-                      controller: _controllers[i],
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      maxLength: 1,
-                      decoration: const InputDecoration(counterText: ''),
-                      onChanged: (v) {
-                        if (v.isNotEmpty && i < 5) {
-                          FocusScope.of(context).nextFocus();
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ),
+              Text('Enviamos un enlace de verificación a ${widget.email}', textAlign: TextAlign.center),
               const SizedBox(height: 8),
-              const Text('El código expira en 04:59', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const Text(
+                'Abre el correo, toca el enlace y vuelve aquí. Si no lo ves, revisa la carpeta de spam.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
               const SizedBox(height: 24),
               PrimaryButton(
-                label: 'VERIFICAR',
-                onPressed: () {
-                  // TODO: validar _code contra el backend.
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
+                label: _checking ? 'COMPROBANDO...' : 'YA VERIFIQUÉ MI CORREO',
+                onPressed: _checking ? null : _checkVerified,
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () {
-                  // TODO: reenviar código.
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Código reenviado')),
-                  );
-                },
-                child: const Text('¿No llegó el código? Reenviar código'),
+                onPressed: _resending ? null : _resend,
+                child: Text(_resending ? 'Enviando...' : '¿No llegó el correo? Reenviar enlace'),
               ),
             ],
           ),

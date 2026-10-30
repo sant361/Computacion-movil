@@ -471,7 +471,12 @@ class AppState extends ChangeNotifier {
   /// Crea un perfil nuevo con [name] (se ignora si está vacío o repetido).
   Future<void> addProfile(String name) async {
     final trimmed = name.trim();
-    if (trimmed.isEmpty || _profiles.contains(trimmed)) return;
+    if (trimmed.isEmpty) return;
+    if (_profiles.contains(trimmed)) {
+      // Permite reintentar un guardado que falló tras actualizar la memoria.
+      await _persistProfiles();
+      return;
+    }
     _profiles.add(trimmed);
     notifyListeners();
     await _persistProfiles();

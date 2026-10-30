@@ -1,9 +1,8 @@
 name: Flutter CI
 
-# Corre automáticamente en cada push y en cada pull request hacia main.
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/verify-commits/**']
   pull_request:
     branches: [main]
 

@@ -272,6 +272,20 @@ class AppState extends ChangeNotifier {
   /// editarlo luego desde la consola de Firebase, sin tocar código). Si
   /// algo falla (sin internet, reglas de Firestore, etc.) se queda
   /// mostrando el catálogo de muestra local en vez de dejar la app vacía.
+  /// Agrega un contenido nuevo al catálogo (Firestore) y lo muestra de
+  /// inmediato en Inicio y Búsqueda. Lanza un error si no se pudo guardar.
+  Future<void> addCatalogItem(CatalogItem item) async {
+    await FirebaseFirestore.instance.collection('catalog').add({
+      'title': item.title,
+      'genre': item.genre,
+      'year': item.year,
+      'language': item.language,
+      'durationMinutes': item.durationMinutes,
+    }).timeout(const Duration(seconds: 10));
+    _catalog = [..._catalog, item];
+    notifyListeners();
+  }
+
   Future<void> loadCatalogFromFirestore() async {
     try {
       final collection = FirebaseFirestore.instance.collection('catalog');

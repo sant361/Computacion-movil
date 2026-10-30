@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../data/catalog_item.dart';
+import '../../state/app_state.dart';
 
 /// Req. 52, 53: administración de contenido, temporadas y episodios.
 class ContentPanelScreen extends StatelessWidget {
@@ -10,6 +13,23 @@ class ContentPanelScreen extends StatelessWidget {
     {'nombre': 'Serie C', 'estado': 'Borrador', 'color': Colors.grey},
   ];
 
+  Future<void> _addContent(BuildContext context) async {
+    final item = await showDialog<CatalogItem>(
+      context: context,
+      builder: (_) => const _NewContentDialog(),
+    );
+    if (item == null || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await appState.addCatalogItem(item);
+      messenger.showSnackBar(SnackBar(content: Text('"${item.title}" agregado al catálogo')));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('No se pudo guardar. Revisa tu conexión e intenta de nuevo.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -17,9 +37,7 @@ class ContentPanelScreen extends StatelessWidget {
         title: const Text('Contenido'),
         actions: [
           TextButton(
-            onPressed: () {
-              // TODO: abrir formulario de carga de nuevo contenido.
-            },
+            onPressed: () => _addContent(context),
             child: const Text('+ Nuevo', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -60,6 +78,113 @@ class ContentPanelScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Formulario para cargar un contenido nuevo al catálogo.
+class _NewContentDialog extends StatefulWidget {
+  const _NewContentDialog();
+
+  @override
+  State<_NewContentDialog> createState() => _NewContentDialogState();
+}
+
+class _NewContentDialogState extends State<_NewContentDialog> {
+  static const _genres = ['Comedia', 'Suspenso', 'Acción', 'Infantil', 'Romance'];
+  static const _languages = ['Español', 'Inglés', 'Francés'];
+
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _yearController = TextEditingController(text: '${DateTime.now().year}');
+  final _durationController = TextEditingController(text: '90');
+  String _genre = _genres.first;
+  String _language = _languages.first;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _yearController.dispose();
+    _durationController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.pop(
+      context,
+      CatalogItem(
+        title: _titleController.text.trim(),
+        genre: _genre,
+        year: int.parse(_yearController.text.trim()),
+        language: _language,
+        durationMinutes: int.parse(_durationController.text.trim()),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nuevo contenido'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(labelText: 'Título'),
+                textCapitalization: TextCapitalization.sentences,
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Escribe un título' : null,
+              ),
+              DropdownButtonFormField<String>(
+                value: _genre,
+                decoration: const InputDecoration(labelText: 'Género'),
+                items: _genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                onChanged: (v) => setState(() => _genre = v ?? _genre),
+              ),
+              DropdownButtonFormField<String>(
+                value: _language,
+                decoration: const InputDecoration(labelText: 'Idioma'),
+                items: _languages.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                onChanged: (v) => setState(() => _language = v ?? _language),
+              ),
+              TextFormField(
+                controller: _yearController,
+                decoration: const InputDecoration(labelText: 'Año'),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                maxLength: 4,
+                validator: (v) {
+                  final year = int.tryParse(v ?? '');
+                  if (year == null || year < 1900 || year > DateTime.now().year + 1) {
+                    return 'Año no válido';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _durationController,
+                decoration: const InputDecoration(labelText: 'Duración (minutos)'),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                maxLength: 3,
+                validator: (v) {
+                  final minutes = int.tryParse(v ?? '');
+                  if (minutes == null || minutes < 1) return 'Duración no válida';
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        TextButton(onPressed: _submit, child: const Text('Guardar')),
+      ],
     );
   }
 }

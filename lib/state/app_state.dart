@@ -43,6 +43,22 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  // Administrador: existe un documento admins/{uid} en Firestore para esta cuenta.
+  bool _isAdmin = false;
+  bool get isAdmin => _isAdmin;
+
+  /// Consulta si la cuenta es administradora. Si falla (sin conexión, sin
+  /// permisos), se asume que NO lo es.
+  Future<void> loadAdminStatus(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('admins').doc(userId).get();
+      _isAdmin = doc.exists;
+    } catch (_) {
+      _isAdmin = false;
+    }
+    notifyListeners();
+  }
+
   // Control parental (se guarda por cuenta, igual que los perfiles).
   String? _parentalUserId;
   String _parentalMaxRating = '+18';
@@ -140,6 +156,7 @@ class AppState extends ChangeNotifier {
     _profileUserId = null;
     _profiles = [];
     _activeProfile = null;
+    _isAdmin = false;
     _parentalUserId = null;
     _parentalMaxRating = '+18';
     _parentalRestrictByProfile = true;

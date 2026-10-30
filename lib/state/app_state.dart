@@ -413,6 +413,28 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  /// Máximo de anuncios que se pueden ver por día para ganar tokens.
+  static const dailyAdLimit = 4;
+
+  String _adsKey(String userId) {
+    final now = DateTime.now();
+    final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return 'adsWatched:$userId:$day';
+  }
+
+  /// Cuántos anuncios completó esta cuenta hoy.
+  Future<int> adsWatchedToday(String userId) async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    return prefs.getInt(_adsKey(userId)) ?? 0;
+  }
+
+  /// Suma un anuncio completado al contador de hoy.
+  Future<void> recordAdWatched(String userId) async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final key = _adsKey(userId);
+    await prefs.setInt(key, (prefs.getInt(key) ?? 0) + 1);
+  }
+
   Future<void> _persistProfiles() async {
     final userId = _profileUserId;
     if (userId == null) return;

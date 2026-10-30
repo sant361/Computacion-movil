@@ -1,10 +1,84 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../state/app_state.dart';
 import 'games_screen.dart';
 
 /// Req. 77, 78: ver un anuncio a cambio de tokens.
-class EarnTokensScreen extends StatelessWidget {
+///
+/// El anuncio es simulado (una cuenta regresiva de [_adSeconds] segundos).
+/// Los tokens solo se acreditan si el anuncio se ve completo, y se respeta
+/// el límite diario de [AppState.dailyAdLimit] anuncios por cuenta.
+class EarnTokensScreen extends StatefulWidget {
   const EarnTokensScreen({super.key});
+
+  @override
+  State<EarnTokensScreen> createState() => _EarnTokensScreenState();
+}
+
+class _EarnTokensScreenState extends State<EarnTokensScreen> {
+  static const _adSeconds = 5;
+  static const _reward = 50;
+  static const _demoAuthEnabled = bool.fromEnvironment('DEMO_AUTH_ENABLED');
+
+  Timer? _timer;
+  int _watchedToday = 0;
+  int _secondsLeft = 0;
+  bool _playing = false;
+
+  String get _userId =>
+      (kIsWeb && _demoAuthEnabled ? null : FirebaseAuth.instance.currentUser?.uid) ?? 'local';
+
+  bool get _limitReached => _watchedToday >= AppState.dailyAdLimit;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCount();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadCount() async {
+    final count = await appState.adsWatchedToday(_userId);
+    if (mounted) setState(() => _watchedToday = count);
+  }
+
+  void _startAd() {
+    if (_playing || _limitReached) return;
+    setState(() {
+      _playing = true;
+      _secondsLeft = _adSeconds;
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_secondsLeft <= 1) {
+        timer.cancel();
+        _finishAd();
+      } else {
+        setState(() => _secondsLeft -= 1);
+      }
+    });
+  }
+
+  Future<void> _finishAd() async {
+    appState.addTokens(_reward, reason: 'Anuncio visto');
+    await appState.recordAdWatched(_userId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('+$_reward tokens acreditados')),
+    );
+    Navigator.pop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +93,18 @@ class EarnTokensScreen extends StatelessWidget {
               aspectRatio: 16 / 9,
               child: Container(
                 decoration: BoxDecoration(color: const Color(0xFFEEF0F4), borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.play_circle_outline, size: 48),
+                child: _playing
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Anuncio', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Text('$_secondsLeft', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      )
+                    : const Icon(Icons.play_circle_outline, size: 48),
               ),
             ),
             const SizedBox(height: 16),
@@ -27,21 +112,14 @@ class EarnTokensScreen extends StatelessWidget {
                 textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             const Text(
-              'Recibe 50 tokens al completar la reproducción del anuncio.',
+              'Recibe $_reward tokens al completar la reproducción del anuncio.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {
-                // TODO: reproducir el anuncio real antes de acreditar los tokens.
-                appState.addTokens(50, reason: 'Anuncio visto');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('+50 tokens acreditados')),
-                );
-                Navigator.pop(context);
-              },
-              child: const Text('VER ANUNCIO'),
+              onPressed: (_playing || _limitReached) ? null : _startAd,
+              child: Text(_playing ? 'VIENDO ANUNCIO...' : 'VER ANUNCIO'),
             ),
             const SizedBox(height: 16),
             const Row(
@@ -53,15 +131,22 @@ class EarnTokensScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             OutlinedButton(
-              onPressed: () => Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const GamesScreen()),
-              ),
+              onPressed: _playing
+                  ? null
+                  : () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const GamesScreen()),
+                      ),
               child: const Text('Ganar tokens con juegos'),
             ),
             const SizedBox(height: 24),
-            const Center(
-              child: Text('Límite diario: 4 anuncios', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            Center(
+              child: Text(
+                _limitReached
+                    ? 'Llegaste al límite de hoy. Vuelve mañana.'
+                    : 'Límite diario: ${AppState.dailyAdLimit} anuncios ($_watchedToday vistos hoy)',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
             ),
           ],
         ),

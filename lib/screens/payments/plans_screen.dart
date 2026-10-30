@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../widgets/primary_button.dart';
 import 'payment_screen.dart';
@@ -17,6 +19,23 @@ class _PlansScreenState extends State<PlansScreen> {
     {'nombre': 'Estándar', 'precio': '\$00.000/mes'},
     {'nombre': 'Premium', 'precio': '\$00.000/mes'},
   ];
+
+  /// Guarda en Firestore el plan elegido (subscriptions/{uid}). Si falla
+  /// (sin internet, sin sesión), no bloquea el flujo de pago.
+  Future<void> _saveSubscription() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      await FirebaseFirestore.instance.collection('subscriptions').doc(user.uid).set({
+        'plan': planes[_selected]['nombre'],
+        'autoRenew': true,
+        'cancelAtPeriodEnd': false,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Se ignora a propósito: el pago simulado debe poder continuar.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +73,11 @@ class _PlansScreenState extends State<PlansScreen> {
             const SizedBox(height: 12),
             PrimaryButton(
               label: 'SUSCRIBIRME',
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen())),
+              onPressed: () async {
+                await _saveSubscription();
+                if (!context.mounted) return;
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+              },
             ),
           ],
         ),

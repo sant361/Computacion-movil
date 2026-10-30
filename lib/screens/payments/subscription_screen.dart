@@ -196,11 +196,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         await FirebaseFirestore.instance
             .collection('subscriptions')
             .doc(user.uid)
-            .update({
+            .set({
           'cancelAtPeriodEnd': true,
           'autoRenew': false,
           'cancellationRequestedAt': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true));
         if (!mounted) return;
         setState(() => _autoRenew = false);
       } catch (_) {

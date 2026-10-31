@@ -26,6 +26,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _autoplay = true;
   late final String _playbackScope;
   bool _restored = false;
+  bool _wasPlaying = false;
   int _lastSavedSecond = -1;
 
   bool? _liked;
@@ -38,14 +39,15 @@ class _PlayerScreenState extends State<PlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _playbackScope = appState.playbackScope;
-    final saved = appState.watchProgress(widget.contentTitle);
     _controller = VideoPlayerController.networkUrl(Uri.parse(_sampleVideoUrl));
     _controller.addListener(_onPlaybackChanged);
-    _initialize(saved);
+    _initialize();
   }
 
-  Future<void> _initialize(WatchProgress? saved) async {
+  Future<void> _initialize() async {
     try {
+      final saved = await appState.prepareWatchProgress(widget.contentTitle);
+      if (!mounted) return;
       await _controller.initialize();
       if (!mounted) return;
       if (saved != null &&
@@ -64,6 +66,11 @@ class _PlayerScreenState extends State<PlayerScreen>
   void _onPlaybackChanged() {
     if (!mounted) return;
     setState(() {});
+    final stopped = _wasPlaying && !_controller.value.isPlaying;
+    _wasPlaying = _controller.value.isPlaying;
+    if (_restored && stopped) {
+      unawaited(_saveProgress(sync: true));
+    }
     final second = _controller.value.position.inSeconds;
     if (_restored && second != _lastSavedSecond) {
       _lastSavedSecond = second;
@@ -71,7 +78,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
-  Future<void> _saveProgress() async {
+  Future<void> _saveProgress({bool sync = false}) async {
     if (!_restored || !_controller.value.isInitialized) return;
     try {
       await appState.saveWatchProgress(
@@ -80,6 +87,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         _controller.value.duration,
         scope: _playbackScope,
       );
+      if (sync) unawaited(appState.syncWatchProgress());
     } catch (_) {
       // La reproducción puede continuar si falla el almacenamiento local.
     }
@@ -88,7 +96,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
-      unawaited(_saveProgress());
+      unawaited(_saveProgress(sync: true));
       _controller.pause();
     }
   }
@@ -96,7 +104,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    unawaited(_saveProgress());
+    unawaited(_saveProgress(sync: true));
     _controller.removeListener(_onPlaybackChanged);
     _controller.dispose();
     super.dispose();

@@ -136,6 +136,18 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ListView(
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         children: [
+          if (appState.progressSyncError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(children: [
+                Expanded(
+                    child: Text(appState.progressSyncError!,
+                        style: const TextStyle(color: Colors.white70))),
+                TextButton(
+                    onPressed: appState.retryProgressSync,
+                    child: const Text('Reintentar')),
+              ]),
+            ),
           _CategoryStrip(
             selected: _selectedCategory,
             onSelected: (genre) => setState(() => _selectedCategory = genre),

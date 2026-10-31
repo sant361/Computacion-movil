@@ -1,0 +1,20 @@
+// Integra este bloque DENTRO de match /databases/{database}/documents
+// en las reglas existentes del proyecto. No reemplaces las otras reglas.
+match /users/{userId}/watchProgress/{progressId} {
+  function isOwner() {
+    return request.auth != null && request.auth.uid == userId;
+  }
+  function validProgress() {
+    let p = request.resource.data;
+    return p.keys().hasAll(['profile', 'title', 'positionMs', 'durationMs', 'updatedAt'])
+      && p.keys().hasOnly(['profile', 'title', 'positionMs', 'durationMs', 'updatedAt'])
+      && p.profile is string && p.profile.size() > 0 && p.profile.size() <= 200
+      && p.title is string && p.title.size() > 0 && p.title.size() <= 300
+      && p.positionMs is int && p.durationMs is int && p.updatedAt is int
+      && p.positionMs >= 0 && p.durationMs > p.positionMs && p.updatedAt >= 0;
+  }
+  allow read: if isOwner();
+  allow create: if isOwner() && validProgress();
+  allow update: if isOwner() && validProgress()
+    && request.resource.data.updatedAt >= resource.data.updatedAt;
+}

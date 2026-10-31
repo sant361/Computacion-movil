@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/catalog_item.dart';
+import '../services/progress_store.dart';
 
 /// Estado compartido simple de la app (sin paquetes externos de estado).
 ///
@@ -15,6 +19,191 @@ import '../data/catalog_item.dart';
 /// El historial de movimientos de tokens NO se guarda (queda solo en memoria)
 /// para mantener esto simple; guardarlo sería el siguiente paso natural.
 class AppState extends ChangeNotifier {
+  AppState(
+      {ProgressStore? progressStore, String? Function()? authenticatedUserId})
+      : _progressStore = progressStore ?? FirestoreProgressStore(),
+        _authenticatedUserId = authenticatedUserId ?? _firebaseUserId;
+
+  static String? _firebaseUserId() =>
+      Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser?.uid;
+
+  final ProgressStore _progressStore;
+  final String? Function() _authenticatedUserId;
+  StreamSubscription<List<SyncedProgress>>? _progressSubscription;
+  Timer? _syncTimer;
+  final Map<String, Set<String>> _pendingProgress = {};
+  bool _syncReady = false;
+  Completer<void>? _firstProgressSnapshot;
+  bool _flushingProgress = false;
+  int _syncGeneration = 0;
+  String? _progressSyncError;
+  String? get progressSyncError => _progressSyncError;
+
+  Future<void> _persistWatchHistory() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setString(
+        'watchHistory',
+        jsonEncode(_watchHistory.map(
+          (scope, entries) => MapEntry(
+              scope,
+              entries.map((title, p) =>
+                  MapEntry(title, [p.positionMs, p.durationMs, p.updatedAt]))),
+        )));
+    await prefs.setString(
+        'pendingWatchProgress',
+        jsonEncode(_pendingProgress.map(
+          (scope, titles) => MapEntry(scope, titles.toList()),
+        )));
+  }
+
+  void _stopProgressSync() {
+    _syncGeneration++;
+    _progressSubscription?.cancel();
+    _progressSubscription = null;
+    _syncTimer?.cancel();
+    _syncReady = false;
+    if (_firstProgressSnapshot?.isCompleted == false) {
+      _firstProgressSnapshot!.complete();
+    }
+    _firstProgressSnapshot = null;
+    _progressSyncError = null;
+  }
+
+  void _startProgressSync() {
+    _stopProgressSync();
+    final uid = _profileUserId;
+    if (uid == null || uid != _authenticatedUserId()) return;
+    final generation = _syncGeneration;
+    _firstProgressSnapshot = Completer<void>();
+    _progressSubscription = _progressStore.watch(uid).listen((records) {
+      if (generation != _syncGeneration || uid != _authenticatedUserId()) {
+        return;
+      }
+      for (final record in records) {
+        final scope = jsonEncode([uid, record.profile]);
+        final history = _watchHistory.putIfAbsent(scope, () => {});
+        final local = history[record.title];
+        if (local == null || record.updatedAt >= local.updatedAt) {
+          history[record.title] = WatchProgress(
+              record.positionMs, record.durationMs, record.updatedAt);
+          _pendingProgress[scope]?.remove(record.title);
+        }
+      }
+      // Migra historiales anteriores sin reemplazar datos ya existentes en nube.
+      for (final entry in _watchHistory.entries) {
+        if ((jsonDecode(entry.key) as List).first != uid) continue;
+        for (final title in entry.value.keys) {
+          if (entry.value[title]!.updatedAt == 0) {
+            final legacy = entry.value[title]!;
+            entry.value[title] =
+                WatchProgress(legacy.positionMs, legacy.durationMs, 1);
+            _pendingProgress.putIfAbsent(entry.key, () => {}).add(title);
+          }
+        }
+      }
+      _syncReady = true;
+      if (_firstProgressSnapshot?.isCompleted == false) {
+        _firstProgressSnapshot!.complete();
+      }
+      _progressSyncError = null;
+      notifyListeners();
+      unawaited(_persistWatchHistory().catchError((Object error) {
+        if (generation != _syncGeneration) return;
+        _progressSyncError =
+            'No se pudo guardar el progreso en este dispositivo.';
+        notifyListeners();
+      }));
+      unawaited(syncWatchProgress());
+    }, onError: (Object error) {
+      if (generation != _syncGeneration) return;
+      _syncReady = false;
+      if (_firstProgressSnapshot?.isCompleted == false) {
+        _firstProgressSnapshot!.complete();
+      }
+      _progressSyncError = 'No se pudo sincronizar el progreso.';
+      notifyListeners();
+    });
+    _syncTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!_syncReady) {
+        _startProgressSync();
+      } else {
+        unawaited(syncWatchProgress());
+      }
+    });
+  }
+
+  Future<WatchProgress?> prepareWatchProgress(String title) async {
+    final first = _firstProgressSnapshot;
+    if (!_syncReady && first != null) {
+      try {
+        await first.future.timeout(const Duration(seconds: 3));
+      } on TimeoutException {
+        // Sin conexión, permite reproducir usando el progreso local.
+      }
+    }
+    return watchProgress(title);
+  }
+
+  Future<void> retryProgressSync() async {
+    _startProgressSync();
+  }
+
+  Future<void> syncWatchProgress() async {
+    final uid = _profileUserId;
+    if (!_syncReady ||
+        _flushingProgress ||
+        uid == null ||
+        uid != _authenticatedUserId()) {
+      return;
+    }
+    _flushingProgress = true;
+    final generation = _syncGeneration;
+    try {
+      final work = _pendingProgress.entries
+          .expand(
+              (entry) => entry.value.map((title) => MapEntry(entry.key, title)))
+          .toList();
+      for (final entry in work) {
+        if (generation != _syncGeneration || uid != _authenticatedUserId()) {
+          return;
+        }
+        final scope = jsonDecode(entry.key) as List;
+        if (scope[0] != uid || scope[1] is! String) continue;
+        final progress = _watchHistory[entry.key]?[entry.value];
+        if (progress == null) continue;
+        await _progressStore.write(
+            uid,
+            SyncedProgress(
+                profile: scope[1] as String,
+                title: entry.value,
+                positionMs: progress.positionMs,
+                durationMs: progress.durationMs,
+                updatedAt: progress.updatedAt));
+        if (generation != _syncGeneration) return;
+        if (identical(_watchHistory[entry.key]?[entry.value], progress)) {
+          _pendingProgress[entry.key]?.remove(entry.value);
+        }
+      }
+      if (generation != _syncGeneration) return;
+      _progressSyncError = null;
+      await _persistWatchHistory();
+    } catch (_) {
+      if (generation == _syncGeneration) {
+        _progressSyncError =
+            'Progreso guardado en este dispositivo. Sincronización pendiente.';
+      }
+    } finally {
+      _flushingProgress = false;
+      if (generation == _syncGeneration) notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopProgressSync();
+    super.dispose();
+  }
+
   static const _tokenBalanceKey = 'tokenBalance';
   static const _myListKey = 'myList';
   static const _isLoggedInKey = 'isLoggedIn';
@@ -27,8 +216,10 @@ class AppState extends ChangeNotifier {
 
   String get playbackScope => jsonEncode([_profileUserId, _activeProfile]);
 
-  WatchProgress? watchProgress(String title) =>
-      _watchHistory[playbackScope]?[title];
+  WatchProgress? watchProgress(String title) {
+    final progress = _watchHistory[playbackScope]?[title];
+    return progress != null && progress.positionMs > 0 ? progress : null;
+  }
 
   Future<void> saveWatchProgress(
     String title,
@@ -40,28 +231,28 @@ class AppState extends ChangeNotifier {
     final history = _watchHistory.putIfAbsent(scope, () => {});
     final milliseconds =
         position.inMilliseconds.clamp(0, duration.inMilliseconds);
-    if (milliseconds == 0 || milliseconds >= duration.inMilliseconds - 250) {
-      history.remove(title);
-    } else {
-      history[title] = WatchProgress(milliseconds, duration.inMilliseconds);
-    }
+    final previous = history[title]?.updatedAt ?? 0;
+    final now = DateTime.now().microsecondsSinceEpoch;
+    final updated = now > previous ? now : previous + 1;
+    history[title] = WatchProgress(
+        milliseconds >= duration.inMilliseconds - 250 ? 0 : milliseconds,
+        duration.inMilliseconds,
+        updated);
+    _pendingProgress.putIfAbsent(scope, () => {}).add(title);
     notifyListeners();
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
-    await prefs.setString(
-        'watchHistory',
-        jsonEncode(_watchHistory.map(
-          (scope, entries) => MapEntry(
-              scope,
-              entries.map(
-                (title, progress) =>
-                    MapEntry(title, [progress.positionMs, progress.durationMs]),
-              )),
-        )));
+    await _persistWatchHistory();
   }
 
   void _loadWatchHistory(SharedPreferences prefs) {
     _watchHistory.clear();
+    _pendingProgress.clear();
     try {
+      final pending =
+          jsonDecode(prefs.getString('pendingWatchProgress') ?? '{}') as Map;
+      for (final entry in pending.entries) {
+        _pendingProgress[entry.key as String] =
+            (entry.value as List).cast<String>().toSet();
+      }
       final scopes = jsonDecode(prefs.getString('watchHistory') ?? '{}') as Map;
       for (final entry in scopes.entries) {
         final history = <String, WatchProgress>{};
@@ -69,8 +260,9 @@ class AppState extends ChangeNotifier {
           final values = item.value as List;
           final position = values[0] as int;
           final duration = values[1] as int;
-          if (position > 0 && duration > position) {
-            history[item.key as String] = WatchProgress(position, duration);
+          if (position >= 0 && duration > position) {
+            history[item.key as String] = WatchProgress(
+                position, duration, values.length > 2 ? values[2] as int : 0);
           }
         }
         _watchHistory[entry.key as String] = history;
@@ -213,6 +405,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _stopProgressSync();
     _isLoggedIn = false;
     _paymentUserId = null;
     _paymentMethods = [];
@@ -457,6 +650,7 @@ class AppState extends ChangeNotifier {
         (_profiles.isNotEmpty ? _profiles.first : null);
     notifyListeners();
     await _persistProfiles();
+    _startProgressSync();
   }
 
   String _parentalKey(String userId) => 'parental:$userId';
@@ -572,18 +766,14 @@ class AppState extends ChangeNotifier {
   /// Elimina el perfil [name]. Si era el activo, el primero que quede
   /// pasa a ser el nuevo activo.
   Future<void> removeProfile(String name) async {
-    _watchHistory.remove(jsonEncode([_profileUserId, name]));
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
-    await prefs.setString(
-        'watchHistory',
-        jsonEncode(_watchHistory.map(
-          (scope, entries) => MapEntry(
-              scope,
-              entries.map(
-                (title, progress) =>
-                    MapEntry(title, [progress.positionMs, progress.durationMs]),
-              )),
-        )));
+    final scope = jsonEncode([_profileUserId, name]);
+    final entries = Map<String, WatchProgress>.from(_watchHistory[scope] ?? {});
+    for (final entry in entries.entries) {
+      await saveWatchProgress(entry.key, Duration.zero,
+          Duration(milliseconds: entry.value.durationMs),
+          scope: scope);
+    }
+    unawaited(syncWatchProgress());
     _profiles.remove(name);
     if (_activeProfile == name) {
       _activeProfile = _profiles.isNotEmpty ? _profiles.first : null;
@@ -594,7 +784,8 @@ class AppState extends ChangeNotifier {
 }
 
 class WatchProgress {
-  const WatchProgress(this.positionMs, this.durationMs);
+  const WatchProgress(this.positionMs, this.durationMs, [this.updatedAt = 0]);
+  final int updatedAt;
   final int positionMs;
   final int durationMs;
   double get fraction => positionMs / durationMs;

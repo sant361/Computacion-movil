@@ -6,6 +6,7 @@ import 'catalog/downloads_screen.dart';
 import 'catalog/notifications_screen.dart';
 import 'content_detail_screen.dart';
 import 'menu_screen.dart';
+import 'player_screen.dart';
 import 'payments/subscription_screen.dart';
 import 'search_screen.dart';
 import 'tokens/tokens_screen.dart';
@@ -47,7 +48,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildScaffold(BuildContext context, Color background) {
     final catalog = appState.catalog;
     final featured = catalog.take(8).toList();
-    final continueWatching = catalog.skip(5).take(4).toList();
+    final continueWatching = catalog
+        .where((item) => appState.watchProgress(item.title) != null)
+        .toList();
     final recommended = catalog.reversed.take(8).toList();
     final featuredItems = catalog.take(5).toList();
 
@@ -159,10 +162,15 @@ class _HomeScreenState extends State<HomeScreen> {
               onActionTap: () => _openSearch(context),
             ),
             const SizedBox(height: 12),
-            _ContinueWatchingSection(
-              items: continueWatching,
-              onItemTap: (item) => _openItem(context, item),
-            ),
+            if (continueWatching.isNotEmpty)
+              _ContinueWatchingSection(
+                items: continueWatching,
+                onItemTap: (item) => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PlayerScreen(contentTitle: item.title),
+                    )),
+              ),
             const SizedBox(height: 12),
             _PosterSection(
               title: 'Elegidas para ti',
@@ -773,7 +781,7 @@ class _ContinueWatchingSection extends StatelessWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: 0.28 + index * 0.16,
+                          value: appState.watchProgress(item.title)!.fraction,
                           minHeight: 4,
                           backgroundColor: Colors.white12,
                           valueColor: const AlwaysStoppedAnimation(

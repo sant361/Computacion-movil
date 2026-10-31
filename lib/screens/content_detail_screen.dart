@@ -49,7 +49,11 @@ class ContentDetailScreen extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('REPRODUCIR'),
+                    label: ListenableBuilder(
+                      listenable: appState,
+                      builder: (_, __) => Text(appState.watchProgress(title) == null
+                          ? 'REPRODUCIR' : 'CONTINUAR VIENDO'),
+                    ),
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => PlayerScreen(contentTitle: title)),

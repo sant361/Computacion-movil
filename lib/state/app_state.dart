@@ -23,17 +23,75 @@ class AppState extends ChangeNotifier {
   static const _supportedLanguages = {'es', 'en', 'fr'};
 
   SharedPreferences? _prefs;
+  final Map<String, Map<String, WatchProgress>> _watchHistory = {};
+
+  String get playbackScope => jsonEncode([_profileUserId, _activeProfile]);
+
+  WatchProgress? watchProgress(String title) =>
+      _watchHistory[playbackScope]?[title];
+
+  Future<void> saveWatchProgress(
+    String title,
+    Duration position,
+    Duration duration, {
+    required String scope,
+  }) async {
+    if (duration.inMilliseconds <= 0) return;
+    final history = _watchHistory.putIfAbsent(scope, () => {});
+    final milliseconds =
+        position.inMilliseconds.clamp(0, duration.inMilliseconds);
+    if (milliseconds == 0 || milliseconds >= duration.inMilliseconds - 250) {
+      history.remove(title);
+    } else {
+      history[title] = WatchProgress(milliseconds, duration.inMilliseconds);
+    }
+    notifyListeners();
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setString(
+        'watchHistory',
+        jsonEncode(_watchHistory.map(
+          (scope, entries) => MapEntry(
+              scope,
+              entries.map(
+                (title, progress) =>
+                    MapEntry(title, [progress.positionMs, progress.durationMs]),
+              )),
+        )));
+  }
+
+  void _loadWatchHistory(SharedPreferences prefs) {
+    _watchHistory.clear();
+    try {
+      final scopes = jsonDecode(prefs.getString('watchHistory') ?? '{}') as Map;
+      for (final entry in scopes.entries) {
+        final history = <String, WatchProgress>{};
+        for (final item in (entry.value as Map).entries) {
+          final values = item.value as List;
+          final position = values[0] as int;
+          final duration = values[1] as int;
+          if (position > 0 && duration > position) {
+            history[item.key as String] = WatchProgress(position, duration);
+          }
+        }
+        _watchHistory[entry.key as String] = history;
+      }
+    } catch (_) {
+      _watchHistory.clear();
+    }
+  }
 
   String _languageCode = 'es';
   String get languageCode => _languageCode;
 
   String? _paymentUserId;
   List<Map<String, String>> _paymentMethods = [];
-  List<Map<String, String>> get paymentMethods => List.unmodifiable(_paymentMethods);
+  List<Map<String, String>> get paymentMethods =>
+      List.unmodifiable(_paymentMethods);
 
   // Mientras se carga desde Firestore (o si falla la conexión), la app
   // muestra este catálogo de muestra para que nunca se vea vacía.
   List<CatalogItem> _catalog = sampleCatalog;
+
   /// Catálogo visible: ya sin lo que supere la clasificación máxima del
   /// control parental.
   List<CatalogItem> get catalog {
@@ -51,7 +109,10 @@ class AppState extends ChangeNotifier {
   /// permisos), se asume que NO lo es.
   Future<void> loadAdminStatus(String userId) async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('admins').doc(userId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('admins')
+          .doc(userId)
+          .get();
       _isAdmin = doc.exists;
     } catch (_) {
       _isAdmin = false;
@@ -87,7 +148,8 @@ class AppState extends ChangeNotifier {
     {'titulo': 'Desbloqueo capítulo 12', 'valor': '-120'},
     {'titulo': 'Juego · Trivia', 'valor': '+80'},
   ];
-  List<Map<String, String>> get tokenHistory => List.unmodifiable(_tokenHistory);
+  List<Map<String, String>> get tokenHistory =>
+      List.unmodifiable(_tokenHistory);
 
   final Set<String> _myList = {};
   bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
@@ -102,6 +164,7 @@ class AppState extends ChangeNotifier {
   /// antes de runApp(), para que la app abra ya con los datos reales.
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
+    _loadWatchHistory(_prefs!);
     _tokenBalance = _prefs!.getInt(_tokenBalanceKey) ?? _tokenBalance;
     _isLoggedIn = _prefs!.getBool(_isLoggedInKey) ?? false;
     _languageCode = _prefs!.getString(_languageCodeKey) ?? _languageCode;
@@ -217,9 +280,8 @@ class AppState extends ChangeNotifier {
       _paymentMethods = [];
     } else {
       final decoded = jsonDecode(raw) as List;
-      _paymentMethods = decoded
-          .map((e) => Map<String, String>.from(e as Map))
-          .toList();
+      _paymentMethods =
+          decoded.map((e) => Map<String, String>.from(e as Map)).toList();
     }
     notifyListeners();
   }
@@ -228,7 +290,8 @@ class AppState extends ChangeNotifier {
     final userId = _paymentUserId;
     if (userId == null) return;
     final prefs = _prefs ??= await SharedPreferences.getInstance();
-    await prefs.setString(_paymentMethodsKey(userId), jsonEncode(_paymentMethods));
+    await prefs.setString(
+        _paymentMethodsKey(userId), jsonEncode(_paymentMethods));
   }
 
   /// Agrega un método de pago nuevo. Solo se guardan los últimos 4
@@ -245,7 +308,8 @@ class AppState extends ChangeNotifier {
         m['principal'] = 'false';
       }
     }
-    final id = '${DateTime.now().microsecondsSinceEpoch}_${_paymentMethods.length}';
+    final id =
+        '${DateTime.now().microsecondsSinceEpoch}_${_paymentMethods.length}';
     _paymentMethods.add({
       'id': id,
       'nombre': '$brand •••• $last4',
@@ -272,7 +336,8 @@ class AppState extends ChangeNotifier {
   /// Elimina el método [id]. Si era el principal y quedan otros métodos,
   /// el primero que queda pasa a ser el nuevo principal.
   Future<void> removePaymentMethod(String id) async {
-    final removed = _paymentMethods.firstWhere((m) => m['id'] == id, orElse: () => <String, String>{});
+    final removed = _paymentMethods.firstWhere((m) => m['id'] == id,
+        orElse: () => <String, String>{});
     final wasDefault = removed['principal'] == 'true';
     _paymentMethods.removeWhere((m) => m['id'] == id);
     if (wasDefault && _paymentMethods.isNotEmpty) {
@@ -336,7 +401,8 @@ class AppState extends ChangeNotifier {
           if (language == null || duration == null) {
             language ??= _defaultLanguageFor(index);
             duration ??= _defaultDurationFor(genre, index);
-            backfill.update(doc.reference, {'language': language, 'durationMinutes': duration});
+            backfill.update(doc.reference,
+                {'language': language, 'durationMinutes': duration});
             needsBackfill = true;
           }
           return CatalogItem(
@@ -367,7 +433,8 @@ class AppState extends ChangeNotifier {
     'Romance': [90, 110],
   };
 
-  String _defaultLanguageFor(int index) => _languageCycle[index % _languageCycle.length];
+  String _defaultLanguageFor(int index) =>
+      _languageCycle[index % _languageCycle.length];
 
   int _defaultDurationFor(String genre, int index) {
     final range = _durationRangeByGenre[genre] ?? [80, 110];
@@ -383,7 +450,9 @@ class AppState extends ChangeNotifier {
   Future<void> loadProfiles(String userId) async {
     _profileUserId = userId;
     final prefs = _prefs ??= await SharedPreferences.getInstance();
-    _profiles = prefs.getStringList(_profilesKey(userId)) ?? ['Ana', 'Luis', 'Kids'];
+    _loadWatchHistory(prefs);
+    _profiles =
+        prefs.getStringList(_profilesKey(userId)) ?? ['Ana', 'Luis', 'Kids'];
     _activeProfile = prefs.getString(_activeProfileKey(userId)) ??
         (_profiles.isNotEmpty ? _profiles.first : null);
     notifyListeners();
@@ -449,7 +518,8 @@ class AppState extends ChangeNotifier {
 
   String _adsKey(String userId) {
     final now = DateTime.now();
-    final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final day =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     return 'adsWatched:$userId:$day';
   }
 
@@ -502,6 +572,18 @@ class AppState extends ChangeNotifier {
   /// Elimina el perfil [name]. Si era el activo, el primero que quede
   /// pasa a ser el nuevo activo.
   Future<void> removeProfile(String name) async {
+    _watchHistory.remove(jsonEncode([_profileUserId, name]));
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setString(
+        'watchHistory',
+        jsonEncode(_watchHistory.map(
+          (scope, entries) => MapEntry(
+              scope,
+              entries.map(
+                (title, progress) =>
+                    MapEntry(title, [progress.positionMs, progress.durationMs]),
+              )),
+        )));
     _profiles.remove(name);
     if (_activeProfile == name) {
       _activeProfile = _profiles.isNotEmpty ? _profiles.first : null;
@@ -509,6 +591,13 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     await _persistProfiles();
   }
+}
+
+class WatchProgress {
+  const WatchProgress(this.positionMs, this.durationMs);
+  final int positionMs;
+  final int durationMs;
+  double get fraction => positionMs / durationMs;
 }
 
 /// Instancia única compartida por toda la app.

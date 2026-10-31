@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'fullscreen_player_screen.dart';
@@ -16,13 +17,16 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends State<PlayerScreen>
+    with WidgetsBindingObserver {
   static const _sampleVideoUrl =
       'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
 
   late final VideoPlayerController _controller;
   bool _autoplay = true;
-  bool _watchFromStart = true;
+  late final String _playbackScope;
+  bool _restored = false;
+  int _lastSavedSecond = -1;
 
   bool? _liked;
   String _subtitles = 'Desactivados';
@@ -32,16 +36,68 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(_sampleVideoUrl))
-      ..addListener(() => setState(() {}))
-      ..initialize().then((_) {
-        setState(() {});
-        if (_autoplay) _controller.play();
-      });
+    WidgetsBinding.instance.addObserver(this);
+    _playbackScope = appState.playbackScope;
+    final saved = appState.watchProgress(widget.contentTitle);
+    _controller = VideoPlayerController.networkUrl(Uri.parse(_sampleVideoUrl));
+    _controller.addListener(_onPlaybackChanged);
+    _initialize(saved);
+  }
+
+  Future<void> _initialize(WatchProgress? saved) async {
+    try {
+      await _controller.initialize();
+      if (!mounted) return;
+      if (saved != null &&
+          saved.positionMs < _controller.value.duration.inMilliseconds) {
+        await _controller.seekTo(Duration(milliseconds: saved.positionMs));
+      }
+      if (!mounted) return;
+      _restored = true;
+      setState(() {});
+      if (_autoplay) await _controller.play();
+    } catch (_) {
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _onPlaybackChanged() {
+    if (!mounted) return;
+    setState(() {});
+    final second = _controller.value.position.inSeconds;
+    if (_restored && second != _lastSavedSecond) {
+      _lastSavedSecond = second;
+      unawaited(_saveProgress());
+    }
+  }
+
+  Future<void> _saveProgress() async {
+    if (!_restored || !_controller.value.isInitialized) return;
+    try {
+      await appState.saveWatchProgress(
+        widget.contentTitle,
+        _controller.value.position,
+        _controller.value.duration,
+        scope: _playbackScope,
+      );
+    } catch (_) {
+      // La reproducción puede continuar si falla el almacenamiento local.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      unawaited(_saveProgress());
+      _controller.pause();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_saveProgress());
+    _controller.removeListener(_onPlaybackChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -58,7 +114,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _toggleMute() {
-    setState(() => _controller.setVolume(_controller.value.volume == 0 ? 1 : 0));
+    setState(
+        () => _controller.setVolume(_controller.value.volume == 0 ? 1 : 0));
   }
 
   Future<void> _pickOption({
@@ -75,7 +132,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              child: Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
             ),
             ...options.map(
               (o) => RadioListTile(
@@ -103,7 +162,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final isReady = _controller.value.isInitialized;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Serie')),
+      appBar: AppBar(title: Text(widget.contentTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -119,20 +178,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         if (!_controller.value.isPlaying)
                           Container(
                             color: Colors.black26,
-                            child: const Icon(Icons.play_arrow, size: 56, color: Colors.white),
+                            child: const Icon(Icons.play_arrow,
+                                size: 56, color: Colors.white),
                           ),
                       ],
                     )
                   : Container(
-                      decoration:
-                          BoxDecoration(color: const Color(0xFFEEF0F4), borderRadius: BorderRadius.circular(10)),
-                      child: const Center(child: CircularProgressIndicator()),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFEEF0F4),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Center(
+                          child: _controller.value.hasError
+                              ? const Text('No se pudo cargar el video.')
+                              : const CircularProgressIndicator()),
                     ),
             ),
           ),
           const SizedBox(height: 8),
           if (isReady) ...[
-            VideoProgressIndicator(_controller, allowScrubbing: true, padding: EdgeInsets.zero),
+            VideoProgressIndicator(_controller,
+                allowScrubbing: true, padding: EdgeInsets.zero),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Text(
@@ -147,18 +212,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.replay_10),
-                onPressed: isReady ? () => _seekBy(const Duration(seconds: -10)) : null,
+                onPressed: isReady
+                    ? () => _seekBy(const Duration(seconds: -10))
+                    : null,
               ),
               IconButton(
-                icon: Icon(isReady && _controller.value.isPlaying ? Icons.pause : Icons.play_arrow),
+                icon: Icon(isReady && _controller.value.isPlaying
+                    ? Icons.pause
+                    : Icons.play_arrow),
                 onPressed: isReady ? _togglePlayPause : null,
               ),
               IconButton(
                 icon: const Icon(Icons.forward_10),
-                onPressed: isReady ? () => _seekBy(const Duration(seconds: 10)) : null,
+                onPressed:
+                    isReady ? () => _seekBy(const Duration(seconds: 10)) : null,
               ),
               IconButton(
-                icon: Icon(isReady && _controller.value.volume == 0 ? Icons.volume_off : Icons.volume_up),
+                icon: Icon(isReady && _controller.value.volume == 0
+                    ? Icons.volume_off
+                    : Icons.volume_up),
                 onPressed: isReady ? _toggleMute : null,
               ),
               IconButton(
@@ -167,7 +239,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     ? () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => FullscreenPlayerScreen(controller: _controller),
+                            builder: (_) =>
+                                FullscreenPlayerScreen(controller: _controller),
                             fullscreenDialog: true,
                           ),
                         )
@@ -182,7 +255,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 label: Text('CC: $_subtitles'), // req. 29 subtítulos
                 onPressed: () => _pickOption(
                   title: 'Subtítulos',
-                  options: const ['Desactivados', 'Español', 'Inglés', 'Portugués'],
+                  options: const [
+                    'Desactivados',
+                    'Español',
+                    'Inglés',
+                    'Portugués'
+                  ],
                   current: _subtitles,
                   onSelected: (v) => setState(() => _subtitles = v),
                 ),
@@ -214,22 +292,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
           OutlinedButton(
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Reproduciendo siguiente episodio (demo)')),
+              const SnackBar(
+                  content: Text('Reproduciendo siguiente episodio (demo)')),
             ),
             child: const Text('Siguiente episodio ▶'),
           ),
           const SizedBox(height: 16),
-          Text(widget.contentTitle, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(widget.contentTitle,
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 8),
           Row(
             children: [
               IconButton(
-                icon: Icon(_liked == true ? Icons.thumb_up : Icons.thumb_up_outlined),
-                onPressed: () => setState(() => _liked = _liked == true ? null : true),
+                icon: Icon(
+                    _liked == true ? Icons.thumb_up : Icons.thumb_up_outlined),
+                onPressed: () =>
+                    setState(() => _liked = _liked == true ? null : true),
               ), // req. 31 calificación
               IconButton(
-                icon: Icon(_liked == false ? Icons.thumb_down : Icons.thumb_down_outlined),
-                onPressed: () => setState(() => _liked = _liked == false ? null : false),
+                icon: Icon(_liked == false
+                    ? Icons.thumb_down
+                    : Icons.thumb_down_outlined),
+                onPressed: () =>
+                    setState(() => _liked = _liked == false ? null : false),
               ),
               const Spacer(),
               OutlinedButton.icon(
@@ -239,22 +325,32 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        appState.isInMyList(widget.contentTitle) ? 'Agregado a Mi lista' : 'Quitado de Mi lista',
+                        appState.isInMyList(widget.contentTitle)
+                            ? 'Agregado a Mi lista'
+                            : 'Quitado de Mi lista',
                       ),
                     ),
                   );
                 }, // req. 34 mi lista
-                icon: Icon(appState.isInMyList(widget.contentTitle) ? Icons.favorite : Icons.favorite_border,
+                icon: Icon(
+                    appState.isInMyList(widget.contentTitle)
+                        ? Icons.favorite
+                        : Icons.favorite_border,
                     size: 18),
                 label: const Text('Lista'),
               ),
             ],
           ),
-          RadioListTile(
-            value: true,
-            groupValue: _watchFromStart,
-            onChanged: (v) => setState(() => _watchFromStart = v ?? true),
-            title: const Text('Ver desde inicio'),
+          TextButton.icon(
+            icon: const Icon(Icons.replay),
+            label: const Text('Ver desde inicio'),
+            onPressed: isReady && _restored
+                ? () async {
+                    await _controller.seekTo(Duration.zero);
+                    await _saveProgress();
+                    if (mounted) await _controller.play();
+                  }
+                : null,
           ),
           CheckboxListTile(
             value: false,

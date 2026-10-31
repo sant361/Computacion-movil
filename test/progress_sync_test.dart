@@ -212,6 +212,42 @@ void main() {
     expect(store.records['cuenta']!['Ana:Serie']!.positionMs, 25000);
   });
 
+  test('el progreso recibido también personaliza las recomendaciones',
+      () async {
+    final first = await device('cuenta');
+    final second = await device('cuenta');
+    await first.saveWatchProgress('Risas en el aire',
+        const Duration(seconds: 20), const Duration(seconds: 100),
+        scope: first.playbackScope);
+    await first.syncWatchProgress();
+    await settleSync();
+    expect(second.hasViewingHistory, isTrue);
+    expect(second.recommendations.first.genre, 'Comedia');
+    expect(
+        second.recommendations.any((item) => item.title == 'Risas en el aire'),
+        isFalse);
+  });
+
+  test('un registro remoto antiguo no restaura gustos de un perfil eliminado',
+      () async {
+    final state = await device('cuenta');
+    await state.saveWatchProgress('Risas en el aire',
+        const Duration(seconds: 20), const Duration(seconds: 100),
+        scope: state.playbackScope);
+    await state.syncWatchProgress();
+    await settleSync();
+    final stale = store.records['cuenta']!['Ana:Risas en el aire']!;
+    await state.removeProfile('Ana');
+    await settleSync();
+    await state.addProfile('Ana');
+    await state.setActiveProfile('Ana');
+    store.records['cuenta']!['Ana:Risas en el aire'] = stale;
+    store.events.add(null);
+    await settleSync();
+    expect(state.hasViewingHistory, isFalse);
+    expect(state.watchProgress('Risas en el aire'), isNull);
+  });
+
   test('valida registros remotos dañados sin detener la lectura', () {
     expect(
         SyncedProgress.fromJson({

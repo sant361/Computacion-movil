@@ -50,6 +50,11 @@ class AppState extends ChangeNotifier {
                   MapEntry(title, [p.positionMs, p.durationMs, p.updatedAt]))),
         )));
     await prefs.setString(
+        'viewedTitles',
+        jsonEncode(_viewedTitles.map(
+          (scope, titles) => MapEntry(scope, titles.toList()),
+        )));
+    await prefs.setString(
         'pendingWatchProgress',
         jsonEncode(_pendingProgress.map(
           (scope, titles) => MapEntry(scope, titles.toList()),
@@ -84,6 +89,7 @@ class AppState extends ChangeNotifier {
         final history = _watchHistory.putIfAbsent(scope, () => {});
         final local = history[record.title];
         if (local == null || record.updatedAt >= local.updatedAt) {
+          _rememberViewed(scope, record.title, record.positionMs);
           history[record.title] = WatchProgress(
               record.positionMs, record.durationMs, record.updatedAt);
           _pendingProgress[scope]?.remove(record.title);
@@ -213,6 +219,38 @@ class AppState extends ChangeNotifier {
 
   SharedPreferences? _prefs;
   final Map<String, Map<String, WatchProgress>> _watchHistory = {};
+  final Map<String, Set<String>> _viewedTitles = {};
+
+  bool get hasViewingHistory => _catalog
+      .any((item) => (_viewedTitles[playbackScope] ?? {}).contains(item.title));
+
+  List<CatalogItem> get recommendations {
+    final viewed = _viewedTitles[playbackScope] ?? <String>{};
+    final genres = <String, int>{};
+    final titles = {for (final item in _catalog) item.title: item.genre};
+    for (final title in viewed) {
+      final genre = titles[title];
+      if (genre != null) genres[genre] = (genres[genre] ?? 0) + 1;
+    }
+    final candidates = {
+      for (final item in catalog)
+        if (!viewed.contains(item.title) && watchProgress(item.title) == null)
+          item.title: item,
+    }.values.toList();
+    candidates.sort((a, b) {
+      final preference = (genres[b.genre] ?? 0).compareTo(genres[a.genre] ?? 0);
+      if (preference != 0) return preference;
+      final year = b.year.compareTo(a.year);
+      return year != 0 ? year : a.title.compareTo(b.title);
+    });
+    return List.unmodifiable(candidates.take(8));
+  }
+
+  void _rememberViewed(String scope, String title, int positionMs) {
+    if (positionMs >= 1000) {
+      _viewedTitles.putIfAbsent(scope, () => {}).add(title);
+    }
+  }
 
   String get playbackScope => jsonEncode([_profileUserId, _activeProfile]);
 
@@ -231,6 +269,7 @@ class AppState extends ChangeNotifier {
     final history = _watchHistory.putIfAbsent(scope, () => {});
     final milliseconds =
         position.inMilliseconds.clamp(0, duration.inMilliseconds);
+    _rememberViewed(scope, title, milliseconds);
     final previous = history[title]?.updatedAt ?? 0;
     final now = DateTime.now().microsecondsSinceEpoch;
     final updated = now > previous ? now : previous + 1;
@@ -246,6 +285,16 @@ class AppState extends ChangeNotifier {
   void _loadWatchHistory(SharedPreferences prefs) {
     _watchHistory.clear();
     _pendingProgress.clear();
+    _viewedTitles.clear();
+    try {
+      final viewed = jsonDecode(prefs.getString('viewedTitles') ?? '{}') as Map;
+      for (final entry in viewed.entries) {
+        _viewedTitles[entry.key as String] =
+            (entry.value as List).cast<String>().toSet();
+      }
+    } catch (_) {
+      _viewedTitles.clear();
+    }
     try {
       final pending =
           jsonDecode(prefs.getString('pendingWatchProgress') ?? '{}') as Map;
@@ -260,6 +309,7 @@ class AppState extends ChangeNotifier {
           final values = item.value as List;
           final position = values[0] as int;
           final duration = values[1] as int;
+          _rememberViewed(entry.key as String, item.key as String, position);
           if (position >= 0 && duration > position) {
             history[item.key as String] = WatchProgress(
                 position, duration, values.length > 2 ? values[2] as int : 0);
@@ -773,6 +823,8 @@ class AppState extends ChangeNotifier {
           Duration(milliseconds: entry.value.durationMs),
           scope: scope);
     }
+    _viewedTitles.remove(scope);
+    await _persistWatchHistory();
     unawaited(syncWatchProgress());
     _profiles.remove(name);
     if (_activeProfile == name) {

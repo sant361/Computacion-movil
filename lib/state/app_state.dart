@@ -298,7 +298,10 @@ class AppState extends ChangeNotifier {
 
   ProfileDetails profileDetails(String name) =>
       _profileData[_profileUserId]?[name] ??
-      ProfileDetails(name: name, isChild: false, maxRating: '+18');
+      ProfileDetails(
+          name: name,
+          isChild: name == 'Kids',
+          maxRating: name == 'Kids' ? 'TP' : '+18');
 
   Future<void> _loadProfileDetails() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
@@ -317,8 +320,12 @@ class AppState extends ChangeNotifier {
       result.clear();
     }
     for (final name in _profiles) {
-      result.putIfAbsent(name,
-          () => ProfileDetails(name: name, isChild: false, maxRating: '+18'));
+      result.putIfAbsent(
+          name,
+          () => ProfileDetails(
+              name: name,
+              isChild: name == 'Kids',
+              maxRating: name == 'Kids' ? 'TP' : '+18'));
     }
     _profileData[uid] = result;
   }
@@ -577,7 +584,13 @@ class AppState extends ChangeNotifier {
   /// Catálogo visible: ya sin lo que supere la clasificación máxima del
   /// control parental.
   List<CatalogItem> get catalog {
-    final limit = parentalRatings.indexOf(_parentalMaxRating);
+    if (profileLocked) return const [];
+    var limit = parentalRatings.indexOf(_parentalMaxRating);
+    final details = profileDetails(_activeProfile ?? '');
+    if (details.isChild) {
+      final childLimit = parentalRatings.indexOf(details.maxRating);
+      limit = childLimit < limit ? childLimit : limit;
+    }
     return List.unmodifiable(
       _catalog.where((item) => parentalRatings.indexOf(item.rating) <= limit),
     );
@@ -585,7 +598,10 @@ class AppState extends ChangeNotifier {
 
   // Administrador: existe un documento admins/{uid} en Firestore para esta cuenta.
   bool _isAdmin = false;
-  bool get isAdmin => _isAdmin;
+  bool get isAdmin =>
+      _isAdmin &&
+      !profileDetails(_activeProfile ?? "").isChild &&
+      !profileLocked;
 
   /// Consulta si la cuenta es administradora. Si falla (sin conexión, sin
   /// permisos), se asume que NO lo es.
@@ -976,6 +992,10 @@ class AppState extends ChangeNotifier {
     required bool blockPurchases,
     required String pin,
   }) async {
+    if (profileLocked || profileDetails(_activeProfile ?? '').isChild) {
+      throw StateError(
+          'Cambia a un perfil adulto para modificar los controles.');
+    }
     _parentalMaxRating = maxRating;
     _parentalRestrictByProfile = restrictByProfile;
     _parentalBlockPurchases = blockPurchases;

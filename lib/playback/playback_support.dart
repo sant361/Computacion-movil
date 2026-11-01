@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../data/catalog_item.dart';
 
 List<CatalogEpisode> orderedEpisodes(CatalogItem item) {
@@ -29,4 +31,26 @@ String formatPlaybackTime(Duration duration) {
   final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
   final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
   return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+}
+
+class PlaybackSleepTimer extends ValueNotifier<Duration?> {
+  PlaybackSleepTimer(this.onElapsed) : super(null);
+  final VoidCallback onElapsed;
+  Timer? _timer;
+  void schedule(Duration? duration) {
+    _timer?.cancel();
+    value = duration;
+    if (duration != null) {
+      _timer = Timer(duration, () {
+        value = null;
+        onElapsed();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 }

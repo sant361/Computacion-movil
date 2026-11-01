@@ -27,6 +27,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   CatalogItem? _item;
   CatalogEpisode? _episode;
   late final String _playbackScope;
+  late final PlaybackSleepTimer _sleepTimer;
   bool _autoplay = true;
   bool _ready = false;
   bool _switching = false;
@@ -49,6 +50,13 @@ class _PlayerScreenState extends State<PlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _playbackScope = appState.playbackScope;
+    _sleepTimer = PlaybackSleepTimer(() {
+      _controller?.pause();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('La reproducción se detuvo por el temporizador.')));
+      }
+    });
     appState.addListener(_onAppChanged);
     _item = appState.catalogItem(widget.contentTitle);
     final item = _item;
@@ -294,6 +302,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     appState.removeListener(_onAppChanged);
     unawaited(_saveProgress(sync: true));
     _generation++;
+    _sleepTimer.dispose();
     _controller?.removeListener(_onPlaybackChanged);
     _controller?.dispose();
     super.dispose();
@@ -399,6 +408,25 @@ class _PlayerScreenState extends State<PlayerScreen>
                       }
                     }
                   : null),
+          ValueListenableBuilder<Duration?>(
+              valueListenable: _sleepTimer,
+              builder: (_, duration, __) => DropdownButtonFormField<int>(
+                    key: ValueKey(duration?.inMinutes ?? 0),
+                    value: duration?.inMinutes ?? 0,
+                    decoration: const InputDecoration(
+                        labelText: 'Detener reproducción después de'),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 0, child: Text('Sin temporizador')),
+                      DropdownMenuItem(value: 15, child: Text('15 minutos')),
+                      DropdownMenuItem(value: 30, child: Text('30 minutos')),
+                      DropdownMenuItem(value: 60, child: Text('60 minutos'))
+                    ],
+                    onChanged: (minutes) => _sleepTimer.schedule(
+                        minutes == null || minutes == 0
+                            ? null
+                            : Duration(minutes: minutes)),
+                  )),
           const SizedBox(height: 16),
           Row(children: [
             IconButton(

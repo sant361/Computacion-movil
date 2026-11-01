@@ -14,7 +14,6 @@ class ContentDetailScreen extends StatefulWidget {
 
 class _ContentDetailScreenState extends State<ContentDetailScreen> {
   int? _season;
-  bool? _liked;
 
   void _play(CatalogItem item,
       {CatalogEpisode? episode, bool trailer = false}) {
@@ -63,7 +62,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
           final progress = appState
               .watchProgress(start?.progressKey(item.title) ?? item.title);
           final playable = isPlayableUrl(start?.videoUrl ?? item.videoUrl);
-          final liked = _liked;
+          final liked = appState.ratingFor(item.title);
           return Scaffold(
               body: CustomScrollView(slivers: [
             SliverAppBar(
@@ -128,15 +127,15 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                         icon: Icon(liked == true
                             ? Icons.thumb_up
                             : Icons.thumb_up_outlined),
-                        onPressed: () => setState(
-                            () => _liked = liked == true ? null : true)),
+                        onPressed: () => appState.setContentRating(
+                            item.title, liked == true ? null : true)),
                     IconButton(
                         tooltip: 'No me gusta',
                         icon: Icon(liked == false
                             ? Icons.thumb_down
                             : Icons.thumb_down_outlined),
-                        onPressed: () => setState(
-                            () => _liked = liked == false ? null : false)),
+                        onPressed: () => appState.setContentRating(
+                            item.title, liked == false ? null : false)),
                   ]),
                   Row(children: [
                     Expanded(

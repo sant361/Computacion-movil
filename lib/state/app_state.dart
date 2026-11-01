@@ -232,6 +232,7 @@ class AppState extends ChangeNotifier {
   final Set<String> _unlockedProfiles = {}, _pendingProfiles = {};
   bool _selectionRequired = false, _leavingChild = false;
   final Map<String, Set<String>> _hiddenHistory = {}, _completed = {};
+  final Map<String, Map<String, bool>> _ratings = {};
 
   String _parentTitle(String key) {
     for (final item in _catalog) {
@@ -466,6 +467,21 @@ class AppState extends ChangeNotifier {
     unawaited(syncWatchProgress());
   }
 
+  bool? ratingFor(String title) =>
+      _ratings[playbackScope]?[_parentTitle(title)];
+
+  Future<void> setContentRating(String title, bool? liked) async {
+    if (profileLocked || catalogItem(title) == null) return;
+    final ratings = _ratings.putIfAbsent(playbackScope, () => {});
+    if (liked == null) {
+      ratings.remove(_parentTitle(title));
+    } else {
+      ratings[_parentTitle(title)] = liked;
+    }
+    notifyListeners();
+    await _persistLibrary();
+  }
+
   Future<void> _persistLibrary() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     for (final pair in {
@@ -477,6 +493,7 @@ class AppState extends ChangeNotifier {
       await prefs.setString(pair.key,
           jsonEncode(pair.value.map((k, v) => MapEntry(k, v.toList()))));
     }
+    await prefs.setString('contentRatings', jsonEncode(_ratings));
   }
 
   Future<void> _loadLibrary() async {
@@ -505,6 +522,15 @@ class AppState extends ChangeNotifier {
       await prefs.setBool('favoritesMigrated', true);
       await _persistLibrary();
     }
+    _ratings.clear();
+    try {
+      final raw = jsonDecode(prefs.getString('contentRatings') ?? '{}') as Map;
+      for (final e in raw.entries) {
+        _ratings[e.key as String] = Map<String, bool>.from(e.value as Map);
+      }
+    } catch (_) {
+      _ratings.clear();
+    }
   }
 
   static const _tokenBalanceKey = 'tokenBalance';
@@ -529,9 +555,17 @@ class AppState extends ChangeNotifier {
       final genre = titles[title];
       if (genre != null) genres[genre] = (genres[genre] ?? 0) + 1;
     }
+    for (final entry in (_ratings[playbackScope] ?? <String, bool>{}).entries) {
+      final genre = titles[entry.key];
+      if (genre != null) {
+        genres[genre] = (genres[genre] ?? 0) + (entry.value ? 2 : -2);
+      }
+    }
     final candidates = {
       for (final item in catalog)
-        if (!viewed.contains(item.title) && watchProgress(item.title) == null)
+        if (!viewed.contains(item.title) &&
+            continueProgress(item) == null &&
+            ratingFor(item.title) != false)
           item.title: item,
     }.values.toList();
     candidates.sort((a, b) {
@@ -1218,6 +1252,7 @@ class AppState extends ChangeNotifier {
     }
     _viewedTitles.remove(scope);
     _favoriteLists.remove(scope);
+    _ratings.remove(scope);
     await _persistLibrary();
     await _persistWatchHistory();
     unawaited(syncWatchProgress());

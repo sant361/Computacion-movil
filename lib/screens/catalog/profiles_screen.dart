@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/services.dart';
 import '../../data/catalog_item.dart';
 import 'package:flutter/material.dart';
 
@@ -68,20 +69,93 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   }
 
   Future<void> _selectProfile(String name) async {
+    final details = appState.profileDetails(name);
+    final fromChild =
+        appState.profileDetails(appState.activeProfile ?? '').isChild;
+    if (fromChild && !details.isChild && !details.hasPin) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Un adulto debe proteger este perfil con un PIN antes de usarlo desde un perfil infantil.')));
+      return;
+    }
+    if (details.isChild &&
+        !appState.profiles.any((profile) {
+          final adult = appState.profileDetails(profile);
+          return !adult.isChild && adult.hasPin;
+        })) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Configura primero un PIN en un perfil adulto para poder volver a él.')));
+      return;
+    }
+    final pin = details.hasPin ? await _requestPin(name) : '';
+    if (pin == null || !mounted) return;
     await _save(() async {
-      await appState.setActiveProfile(name);
+      await appState.setActiveProfile(name, pin: pin);
       if (mounted) Navigator.pop(context, name);
     });
   }
 
+  Future<String?> _requestPin(String name) async {
+    var pin = '';
+    var waiting = false;
+    String? error;
+    return showDialog<String>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+              builder: (context, update) => AlertDialog(
+                title: Text('PIN de $name'),
+                content: TextField(
+                  autofocus: true,
+                  obscureText: true,
+                  maxLength: 6,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: (value) => pin = value,
+                  decoration: InputDecoration(
+                      labelText: 'PIN de 4 a 6 dígitos', errorText: error),
+                ),
+                actions: [
+                  TextButton(
+                      onPressed:
+                          waiting ? null : () => Navigator.pop(dialogContext),
+                      child: const Text('Cancelar')),
+                  TextButton(
+                      onPressed: waiting
+                          ? null
+                          : () async {
+                              update(() => waiting = true);
+                              final valid =
+                                  await appState.verifyProfilePin(name, pin);
+                              if (!dialogContext.mounted) return;
+                              if (valid) {
+                                Navigator.pop(dialogContext, pin);
+                              } else {
+                                update(() {
+                                  waiting = false;
+                                  error = 'El PIN no es correcto.';
+                                });
+                              }
+                            },
+                      child: Text(waiting ? 'Comprobando...' : 'Continuar')),
+                ],
+              ),
+            ));
+  }
+
   Future<void> _editProfile(String name) async {
     final details = appState.profileDetails(name);
+    if (details.hasPin && await _requestPin(name) == null) return;
+    if (!mounted) return;
     var avatar =
         _avatarIcons.containsKey(details.avatar) ? details.avatar : 'person';
     final avatarUrl = TextEditingController(
         text: details.avatar.startsWith('https://') ? details.avatar : '');
     var child = details.isChild;
     var rating = details.maxRating;
+    var pin = '';
+    var removePin = false;
+    String? setupError;
     final form = GlobalKey<FormState>();
     final accepted = await showDialog<bool>(
         context: context,
@@ -93,6 +167,10 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                         key: form,
                         child:
                             Column(mainAxisSize: MainAxisSize.min, children: [
+                          if (setupError != null)
+                            Text(setupError!,
+                                style:
+                                    const TextStyle(color: Colors.redAccent)),
                           const Align(
                               alignment: Alignment.centerLeft,
                               child: Text('Avatar')),
@@ -110,22 +188,23 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                                       ))
                                   .toList()),
                           TextFormField(
-                              controller: avatarUrl,
-                              keyboardType: TextInputType.url,
-                              decoration: const InputDecoration(
-                                  labelText:
-                                      'URL de imagen del avatar (opcional)'),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return null;
-                                }
-                                final uri = Uri.tryParse(value.trim());
-                                return uri != null &&
-                                        uri.scheme == 'https' &&
-                                        uri.host.isNotEmpty
-                                    ? null
-                                    : 'Usa una dirección HTTPS válida.';
-                              }),
+                            controller: avatarUrl,
+                            decoration: const InputDecoration(
+                                labelText:
+                                    'URL de imagen del avatar (opcional)'),
+                            keyboardType: TextInputType.url,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return null;
+                              }
+                              final uri = Uri.tryParse(value.trim());
+                              return uri != null &&
+                                      uri.scheme == 'https' &&
+                                      uri.host.isNotEmpty
+                                  ? null
+                                  : 'Usa una dirección HTTPS válida.';
+                            },
+                          ),
                           SwitchListTile(
                               contentPadding: EdgeInsets.zero,
                               title: const Text('Perfil infantil'),
@@ -135,17 +214,43 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                                     if (child) rating = 'TP';
                                   })),
                           DropdownButtonFormField<String>(
-                              value: parentalRatings.contains(rating)
-                                  ? rating
-                                  : 'TP',
-                              decoration: const InputDecoration(
-                                  labelText: 'Clasificación máxima'),
-                              items: parentalRatings
-                                  .map((value) => DropdownMenuItem(
-                                      value: value, child: Text(value)))
-                                  .toList(),
-                              onChanged: (value) =>
-                                  update(() => rating = value ?? 'TP')),
+                            value: parentalRatings.contains(rating)
+                                ? rating
+                                : 'TP',
+                            decoration: const InputDecoration(
+                                labelText: 'Clasificación máxima'),
+                            items: parentalRatings
+                                .map((value) => DropdownMenuItem(
+                                    value: value, child: Text(value)))
+                                .toList(),
+                            onChanged: (value) =>
+                                update(() => rating = value ?? 'TP'),
+                          ),
+                          TextFormField(
+                            obscureText: true,
+                            keyboardType: TextInputType.number,
+                            maxLength: 6,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                            decoration: InputDecoration(
+                                labelText: details.hasPin
+                                    ? 'Nuevo PIN (opcional)'
+                                    : 'PIN de acceso (opcional)'),
+                            onChanged: (value) => pin = value,
+                            validator: (value) => value != null &&
+                                    value.isNotEmpty &&
+                                    (value.length < 4 || value.length > 6)
+                                ? 'Usa de 4 a 6 dígitos.'
+                                : null,
+                          ),
+                          if (details.hasPin)
+                            CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                value: removePin,
+                                onChanged: (value) =>
+                                    update(() => removePin = value ?? false),
+                                title: const Text('Quitar PIN')),
                         ]))),
                 actions: [
                   TextButton(
@@ -153,6 +258,16 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                       child: const Text('Cancelar')),
                   TextButton(
                       onPressed: () {
+                        if (child &&
+                            name == appState.activeProfile &&
+                            !appState.profiles.any((profile) =>
+                                profile != name &&
+                                !appState.profileDetails(profile).isChild &&
+                                appState.profileDetails(profile).hasPin)) {
+                          update(() => setupError =
+                              'Protege primero otro perfil adulto con un PIN.');
+                          return;
+                        }
                         if (form.currentState!.validate()) {
                           Navigator.pop(dialogContext, true);
                         }
@@ -166,7 +281,14 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     avatarUrl.dispose();
     if (accepted != true || !mounted) return;
     await _save(() => appState.configureProfile(name,
-        avatar: selectedAvatar, isChild: child, maxRating: rating));
+        avatar: selectedAvatar,
+        isChild: child,
+        maxRating: rating,
+        pin: removePin
+            ? ''
+            : pin.isEmpty
+                ? null
+                : pin));
   }
 
   Future<void> _addProfile() async {
@@ -217,6 +339,10 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   }
 
   Future<void> _removeProfile(String name) async {
+    if (appState.profileDetails(name).hasPin &&
+        await _requestPin(name) == null) {
+      return;
+    }
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -309,6 +435,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                             name: name,
                             avatar: appState.profileDetails(name).avatar,
                             isChild: appState.profileDetails(name).isChild,
+                            hasPin: appState.profileDetails(name).hasPin,
                             selected: active == name,
                             showDelete: _editMode && !childMode,
                             onEdit: _saving || childMode
@@ -358,6 +485,7 @@ class _ProfileAvatar extends StatelessWidget {
   final bool showDelete;
   final String avatar;
   final bool isChild;
+  final bool hasPin;
   final VoidCallback? onEdit;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
@@ -371,6 +499,7 @@ class _ProfileAvatar extends StatelessWidget {
     this.showDelete = false,
     this.avatar = 'initials',
     this.isChild = false,
+    this.hasPin = false,
     this.onEdit,
   });
 
@@ -480,10 +609,12 @@ class _ProfileAvatar extends StatelessWidget {
                               selected ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
-                      if (!isAdd && isChild)
-                        const Text('Infantil',
-                            style:
-                                TextStyle(fontSize: 11, color: Colors.white70)),
+                      if (!isAdd && (isChild || hasPin))
+                        Text(
+                            [if (isChild) 'Infantil', if (hasPin) 'Protegido']
+                                .join(' · '),
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.white70)),
                       if (selected && !isAdd)
                         const Text(
                           'Perfil activo',

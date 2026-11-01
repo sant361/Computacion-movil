@@ -7,6 +7,7 @@ import 'catalog/notifications_screen.dart';
 import 'content_detail_screen.dart';
 import 'menu_screen.dart';
 import 'catalog/my_list_screen.dart';
+import 'catalog/profiles_screen.dart';
 import 'player_screen.dart';
 import 'payments/subscription_screen.dart';
 import 'search_screen.dart';
@@ -47,6 +48,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildScaffold(BuildContext context, Color background) {
+    if (appState.profileLocked) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Selecciona tu perfil')),
+        body: Center(
+            child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.lock_outline, size: 48),
+                    const SizedBox(height: 16),
+                    const Text('Selecciona tu perfil para continuar',
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                        onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const ProfilesScreen())),
+                        child: const Text('Elegir perfil')),
+                  ],
+                ))),
+      );
+    }
     final catalog = appState.catalog;
     final featured = catalog.take(8).toList();
     final continueWatching = catalog

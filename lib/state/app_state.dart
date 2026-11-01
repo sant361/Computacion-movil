@@ -233,6 +233,9 @@ class AppState extends ChangeNotifier {
   bool _selectionRequired = false, _leavingChild = false;
   final Map<String, Set<String>> _hiddenHistory = {}, _completed = {};
   final Map<String, Map<String, bool>> _ratings = {};
+  List<AppNotification> _notifications = [];
+  String? _notificationOwner;
+  bool notificationsEnabled = true;
 
   String _parentTitle(String key) {
     for (final item in _catalog) {
@@ -482,6 +485,76 @@ class AppState extends ChangeNotifier {
     await _persistLibrary();
   }
 
+  List<AppNotification> get notifications => notificationsEnabled
+      ? _notifications
+          .where((n) => catalogItem(n.contentTitle) != null)
+          .toList()
+      : const [];
+
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    notificationsEnabled = enabled;
+    notifyListeners();
+    await _persistLibrary();
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    _notifications = _notifications
+        .map((n) => n.id == id
+            ? AppNotification(n.id, n.title, n.detail, n.contentTitle, true)
+            : n)
+        .toList();
+    notifyListeners();
+    await _persistLibrary();
+  }
+
+  Future<void> _detectReleases(List<CatalogItem> items) async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final uid = _authenticatedUserId() ?? _profileUserId ?? 'local';
+    if (_notificationOwner != uid) {
+      _notificationOwner = uid;
+      notificationsEnabled =
+          prefs.getBool('releaseNotificationsEnabled:$uid') ?? true;
+      try {
+        _notifications = (jsonDecode(
+                prefs.getString('releaseNotifications:$uid') ?? '[]') as List)
+            .map((n) =>
+                AppNotification.fromJson(Map<String, dynamic>.from(n as Map)))
+            .toList();
+      } catch (_) {
+        _notifications = [];
+      }
+    }
+    final key = 'knownReleases:$uid';
+    final previous = prefs.getStringList(key);
+    final known = previous?.toSet() ?? <String>{};
+    final next = <String>{};
+    for (final item in items) {
+      final id = item.id.isEmpty ? item.title : item.id;
+      final releases = {
+        id: 'Nuevo título: ${item.title}',
+        for (final e in item.episodes)
+          '$id:${e.id.isEmpty ? e.progressKey(item.title) : e.id}':
+              'Nuevo episodio: ${e.title}'
+      };
+      for (final release in releases.entries) {
+        next.add(release.key);
+        if (previous != null &&
+            !known.contains(release.key) &&
+            notificationsEnabled) {
+          _notifications.insert(
+              0,
+              AppNotification(
+                  release.key, release.value, item.title, item.title, false));
+        }
+      }
+    }
+    if (_notifications.length > 100) {
+      _notifications = _notifications.take(100).toList();
+    }
+    await prefs.setStringList(key, next.toList());
+    await _persistLibrary();
+  }
+
   Future<void> _persistLibrary() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     for (final pair in {
@@ -494,6 +567,13 @@ class AppState extends ChangeNotifier {
           jsonEncode(pair.value.map((k, v) => MapEntry(k, v.toList()))));
     }
     await prefs.setString('contentRatings', jsonEncode(_ratings));
+    final uid = _notificationOwner;
+    if (uid != null) {
+      await prefs.setString('releaseNotifications:$uid',
+          jsonEncode(_notifications.map((n) => n.toJson()).toList()));
+      await prefs.setBool(
+          'releaseNotificationsEnabled:$uid', notificationsEnabled);
+    }
   }
 
   Future<void> _loadLibrary() async {
@@ -507,9 +587,9 @@ class AppState extends ChangeNotifier {
       pair.value.clear();
       try {
         final raw = jsonDecode(prefs.getString(pair.key) ?? '{}') as Map;
-        for (final e in raw.entries) {
-          pair.value[e.key as String] =
-              (e.value as List).cast<String>().toSet();
+        for (final entry in raw.entries) {
+          pair.value[entry.key as String] =
+              (entry.value as List).cast<String>().toSet();
         }
       } catch (_) {
         pair.value.clear();
@@ -530,6 +610,20 @@ class AppState extends ChangeNotifier {
       }
     } catch (_) {
       _ratings.clear();
+    }
+    final uid = _profileUserId ?? _authenticatedUserId() ?? 'local';
+    _notificationOwner = uid;
+    notificationsEnabled =
+        prefs.getBool('releaseNotificationsEnabled:$uid') ?? true;
+    try {
+      _notifications =
+          (jsonDecode(prefs.getString('releaseNotifications:$uid') ?? '[]')
+                  as List)
+              .map((e) =>
+                  AppNotification.fromJson(Map<String, dynamic>.from(e as Map)))
+              .toList();
+    } catch (_) {
+      _notifications = [];
     }
   }
 
@@ -817,6 +911,9 @@ class AppState extends ChangeNotifier {
     _unlockedProfiles.clear();
     _selectionRequired = false;
     _leavingChild = false;
+    _notifications = [];
+    _notificationOwner = null;
+    notificationsEnabled = true;
     _isLoggedIn = false;
     _paymentUserId = null;
     _paymentMethods = [];
@@ -980,6 +1077,7 @@ class AppState extends ChangeNotifier {
     }
     final saved = await _catalogStore.add(item);
     _catalog = [..._catalog, saved];
+    await _detectReleases(_catalog);
     await _cacheCatalog();
     notifyListeners();
   }
@@ -993,6 +1091,7 @@ class AppState extends ChangeNotifier {
     }
     await _catalogStore.update(item);
     _catalog = _catalog.map((old) => old.id == item.id ? item : old).toList();
+    await _detectReleases(_catalog);
     await _cacheCatalog();
     notifyListeners();
   }
@@ -1031,6 +1130,7 @@ class AppState extends ChangeNotifier {
   Future<void> refreshCatalog() async {
     try {
       final incoming = await _catalogStore.load();
+      await _detectReleases(incoming);
       _catalog = incoming;
       await _cacheCatalog();
       catalogError = null;
@@ -1282,4 +1382,24 @@ class HistoryEntry {
   final String title;
   final int positionMs, durationMs, updatedAt;
   final bool completed;
+}
+
+class AppNotification {
+  const AppNotification(
+      this.id, this.title, this.detail, this.contentTitle, this.read);
+  final String id, title, detail, contentTitle;
+  final bool read;
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'detail': detail,
+        'contentTitle': contentTitle,
+        'read': read
+      };
+  factory AppNotification.fromJson(Map<String, dynamic> j) => AppNotification(
+      j['id'] as String,
+      j['title'] as String,
+      j['detail'] as String,
+      j['contentTitle'] as String,
+      j['read'] == true);
 }

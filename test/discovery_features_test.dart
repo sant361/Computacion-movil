@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:streaming_app/screens/search_screen.dart';
 import 'package:streaming_app/screens/catalog/my_list_screen.dart';
 import 'package:streaming_app/screens/catalog/viewing_history_screen.dart';
+import 'package:streaming_app/screens/catalog/notifications_screen.dart';
 import 'package:streaming_app/state/app_state.dart';
 import 'package:streaming_app/widgets/catalog_artwork.dart';
 
@@ -79,6 +80,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(
         find.text('Aún no hay reproducciones en este perfil.'), findsOneWidget);
+  });
+
+  testWidgets(
+      'las notificaciones no muestran avisos ficticios y guardan la preferencia',
+      (tester) async {
+    await appState.loadProfiles('avisos-ui');
+    await tester.pumpWidget(const MaterialApp(home: NotificationsScreen()));
+    expect(find.text('Tu pago fue aprobado'), findsNothing);
+    final before = appState.notificationsEnabled;
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pump();
+    expect(appState.notificationsEnabled, !before);
   });
 
   testWidgets('una portada vacía o inválida conserva una imagen de respaldo',

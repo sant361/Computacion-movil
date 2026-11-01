@@ -1,52 +1,44 @@
 import 'package:flutter/material.dart';
+import '../../state/app_state.dart';
 
-/// Req. 43, 44: centro de notificaciones y preferencias.
-class NotificationsScreen extends StatefulWidget {
+class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
   @override
-  State<NotificationsScreen> createState() => _NotificationsScreenState();
-}
-
-class _NotificationsScreenState extends State<NotificationsScreen> {
-  final Map<String, bool> _preferences = {
-    'Estrenos': true,
-    'Cuenta y pagos': true,
-    'Novedades': true,
-  };
-
-  final List<Map<String, String>> _notifications = const [
-    {'titulo': 'Nuevo capítulo disponible', 'detalle': 'Serie · hace 2 h'},
-    {'titulo': 'Tu pago fue aprobado', 'detalle': 'Plan Estándar · hoy'},
-    {'titulo': 'Estreno esta semana', 'detalle': 'Película · hace 1 día'},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Notificaciones')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          ..._notifications.map(
-            (n) => ListTile(
-              leading: const Icon(Icons.notifications_outlined),
-              title: Text(n['titulo']!),
-              subtitle: Text(n['detalle']!),
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) => Scaffold(
+          appBar: AppBar(title: const Text('Notificaciones')),
+          body: ListView(padding: const EdgeInsets.all(16), children: [
+            SwitchListTile(
+              title: const Text('Avisos de estrenos'),
+              subtitle: const Text(
+                  'Recibe avisos aquí cuando haya nuevos títulos o episodios.'),
+              value: appState.notificationsEnabled,
+              onChanged: appState.setNotificationsEnabled,
             ),
-          ),
-          const Divider(height: 32),
-          const Text('Preferencias', style: TextStyle(fontWeight: FontWeight.bold)),
-          ..._preferences.keys.map(
-            (k) => SwitchListTile(
-              title: Text(k),
-              value: _preferences[k]!,
-              onChanged: (v) => setState(() => _preferences[k] = v),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+            const Divider(height: 32),
+            if (appState.notifications.isEmpty)
+              const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child:
+                      Center(child: Text('No hay nuevos avisos por ahora.'))),
+            ...appState.notifications.map((notification) => ListTile(
+                  leading: Icon(notification.read
+                      ? Icons.notifications_none
+                      : Icons.notifications_active_outlined),
+                  title: Text(notification.title,
+                      style: TextStyle(
+                          fontWeight: notification.read
+                              ? FontWeight.normal
+                              : FontWeight.bold)),
+                  subtitle: Text(notification.detail),
+                  trailing: notification.read
+                      ? null
+                      : const Icon(Icons.circle, size: 8),
+                  onTap: () => appState.markNotificationRead(notification.id),
+                )),
+          ]),
+        ),
+      );
 }

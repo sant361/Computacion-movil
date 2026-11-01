@@ -7,8 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/catalog_item.dart';
 import '../services/progress_store.dart';
-import '../services/catalog_store.dart';
 import '../services/profile_store.dart';
+import '../services/catalog_store.dart';
 import '../data/profile_details.dart';
 export '../data/profile_details.dart';
 
@@ -25,13 +25,13 @@ export '../data/profile_details.dart';
 class AppState extends ChangeNotifier {
   AppState(
       {ProgressStore? progressStore,
-      CatalogStore? catalogStore,
       ProfileStore? profileStore,
+      CatalogStore? catalogStore,
       Future<bool> Function(String)? adminStatus,
       String? Function()? authenticatedUserId})
-      : _profileStore = profileStore ?? FirestoreProfileStore(),
+      : _adminStatus = adminStatus,
+        _profileStore = profileStore ?? FirestoreProfileStore(),
         _catalogStore = catalogStore ?? FirestoreCatalogStore(),
-        _adminStatus = adminStatus,
         _progressStore = progressStore ?? FirestoreProgressStore(),
         _authenticatedUserId = authenticatedUserId ?? _firebaseUserId;
 
@@ -227,26 +227,40 @@ class AppState extends ChangeNotifier {
     super.dispose();
   }
 
-  final CatalogStore _catalogStore;
   final Future<bool> Function(String)? _adminStatus;
-  Timer? _catalogTimer;
-  final Map<String, Set<String>> _favoriteLists = {};
-  final Map<String, Set<String>> _hiddenContinue = {};
+  final ProfileStore _profileStore;
+  final CatalogStore _catalogStore;
   final Map<String, Map<String, ProfileDetails>> _profileData = {};
-  final Set<String> _unlockedProfiles = {}, _pendingProfiles = {};
+  final Set<String> _unlockedProfiles = {};
+  final Set<String> _pendingProfiles = {};
+  StreamSubscription<List<ProfileDetails>>? _profileSubscription;
+  Timer? _profileTimer, _catalogTimer;
+  int _profileGeneration = 0;
+  bool _profileWriting = false;
   bool _selectionRequired = false, _leavingChild = false;
-  final Map<String, Set<String>> _hiddenHistory = {}, _completed = {};
+  bool _profileReadFailed = false;
+  String? profileSyncError;
+  final Map<String, Set<String>> _favoriteLists = {},
+      _hiddenContinue = {},
+      _hiddenHistory = {},
+      _completed = {};
   final Map<String, Map<String, bool>> _ratings = {};
   List<AppNotification> _notifications = [];
   String? _notificationOwner;
   bool notificationsEnabled = true;
-  final ProfileStore _profileStore;
-  StreamSubscription<List<ProfileDetails>>? _profileSubscription;
-  Timer? _profileTimer;
-  int _profileGeneration = 0;
-  bool _profileWriting = false, _profileReadFailed = false;
-  String? profileSyncError;
 
+  bool get profileLocked =>
+      _selectionRequired ||
+      (_activeProfile != null &&
+          (profileDetails(_activeProfile!).deleted ||
+              (profileDetails(_activeProfile!).hasPin &&
+                  !_unlockedProfiles.contains(_activeProfile))));
+  ProfileDetails profileDetails(String name) =>
+      _profileData[_profileUserId]?[name] ??
+      ProfileDetails(
+          name: name,
+          isChild: name == 'Kids',
+          maxRating: name == 'Kids' ? 'TP' : '+18');
   String _parentTitle(String key) {
     for (final item in _catalog) {
       if (item.title == key ||
@@ -255,6 +269,25 @@ class AppState extends ChangeNotifier {
       }
     }
     return key.split(' · T').first;
+  }
+
+  Set<String> get _currentFavorites => _profileUserId == null
+      ? _myList
+      : _favoriteLists.putIfAbsent(playbackScope, () => {});
+  List<String> get myListTitles =>
+      _currentFavorites.where((t) => catalogItem(t) != null).toList();
+  bool? ratingFor(String title) =>
+      _ratings[playbackScope]?[_parentTitle(title)];
+  Future<void> setContentRating(String title, bool? liked) async {
+    if (profileLocked || catalogItem(title) == null) return;
+    final ratings = _ratings.putIfAbsent(playbackScope, () => {});
+    if (liked == null) {
+      ratings.remove(_parentTitle(title));
+    } else {
+      ratings[_parentTitle(title)] = liked;
+    }
+    notifyListeners();
+    await _persistLibrary();
   }
 
   WatchProgress? continueProgress(CatalogItem item) {
@@ -284,13 +317,6 @@ class AppState extends ChangeNotifier {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Set<String> get _currentFavorites => _profileUserId == null
-      ? _myList
-      : _favoriteLists.putIfAbsent(playbackScope, () => {});
-
-  List<String> get myListTitles =>
-      _currentFavorites.where((t) => catalogItem(t) != null).toList();
-
   Future<void> removeFromContinueWatching(String title) async {
     final keys = (_watchHistory[playbackScope] ?? {})
         .keys
@@ -309,19 +335,185 @@ class AppState extends ChangeNotifier {
     unawaited(syncWatchProgress());
   }
 
-  bool get profileLocked =>
-      _selectionRequired ||
-      (_activeProfile != null &&
-          (profileDetails(_activeProfile!).deleted ||
-              (profileDetails(_activeProfile!).hasPin &&
-                  !_unlockedProfiles.contains(_activeProfile))));
+  List<HistoryEntry> get viewingHistory {
+    final entries = <HistoryEntry>[];
+    for (final entry
+        in (_watchHistory[playbackScope] ?? <String, WatchProgress>{})
+            .entries) {
+      if (catalogItem(entry.key) == null ||
+          (_hiddenHistory[playbackScope] ?? {}).contains(entry.key)) {
+        continue;
+      }
+      final p = entry.value;
+      if (p.positionMs == 0 &&
+          !(_viewedTitles[playbackScope] ?? {})
+              .contains(_parentTitle(entry.key))) {
+        continue;
+      }
+      entries.add(HistoryEntry(entry.key, p.positionMs, p.durationMs,
+          p.updatedAt, (_completed[playbackScope] ?? {}).contains(entry.key)));
+    }
+    entries.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return List.unmodifiable(entries);
+  }
 
-  ProfileDetails profileDetails(String name) =>
-      _profileData[_profileUserId]?[name] ??
-      ProfileDetails(
-          name: name,
-          isChild: name == 'Kids',
-          maxRating: name == 'Kids' ? 'TP' : '+18');
+  Future<void> clearViewingHistory() async {
+    final keys = (_watchHistory[playbackScope] ?? {}).keys.toList();
+    for (final key in keys) {
+      final p = _watchHistory[playbackScope]![key]!;
+      await saveWatchProgress(
+          key, Duration.zero, Duration(milliseconds: p.durationMs),
+          scope: playbackScope);
+    }
+    _viewedTitles.remove(playbackScope);
+    _hiddenHistory.putIfAbsent(playbackScope, () => {}).addAll(keys);
+    _completed.remove(playbackScope);
+    notifyListeners();
+    await _persistWatchHistory();
+    await _persistLibrary();
+    unawaited(syncWatchProgress());
+  }
+
+  Future<void> _persistLibrary() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    for (final pair in {
+      'favoriteLists': _favoriteLists,
+      'hiddenContinue': _hiddenContinue,
+      'hiddenHistory': _hiddenHistory,
+      'completedPlayback': _completed
+    }.entries) {
+      await prefs.setString(pair.key,
+          jsonEncode(pair.value.map((k, v) => MapEntry(k, v.toList()))));
+    }
+    await prefs.setString('contentRatings', jsonEncode(_ratings));
+    final uid = _notificationOwner;
+    if (uid != null) {
+      await prefs.setString('releaseNotifications:$uid',
+          jsonEncode(_notifications.map((n) => n.toJson()).toList()));
+      await prefs.setBool(
+          'releaseNotificationsEnabled:$uid', notificationsEnabled);
+    }
+  }
+
+  Future<void> _loadLibrary() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    for (final pair in {
+      'favoriteLists': _favoriteLists,
+      'hiddenContinue': _hiddenContinue,
+      'hiddenHistory': _hiddenHistory,
+      'completedPlayback': _completed
+    }.entries) {
+      pair.value.clear();
+      try {
+        final raw = jsonDecode(prefs.getString(pair.key) ?? '{}') as Map;
+        for (final entry in raw.entries) {
+          pair.value[entry.key as String] =
+              (entry.value as List).cast<String>().toSet();
+        }
+      } catch (_) {
+        pair.value.clear();
+      }
+    }
+    if (!prefs.containsKey('favoritesMigrated') &&
+        _profileUserId != null &&
+        _myList.isNotEmpty) {
+      _currentFavorites.addAll(_myList);
+      await prefs.setBool('favoritesMigrated', true);
+      await _persistLibrary();
+    }
+    _ratings.clear();
+    try {
+      final raw = jsonDecode(prefs.getString('contentRatings') ?? '{}') as Map;
+      for (final e in raw.entries) {
+        _ratings[e.key as String] = Map<String, bool>.from(e.value as Map);
+      }
+    } catch (_) {
+      _ratings.clear();
+    }
+    final uid = _profileUserId ?? _authenticatedUserId() ?? 'local';
+    _notificationOwner = uid;
+    notificationsEnabled =
+        prefs.getBool('releaseNotificationsEnabled:$uid') ?? true;
+    try {
+      _notifications =
+          (jsonDecode(prefs.getString('releaseNotifications:$uid') ?? '[]')
+                  as List)
+              .map((e) =>
+                  AppNotification.fromJson(Map<String, dynamic>.from(e as Map)))
+              .toList();
+    } catch (_) {
+      _notifications = [];
+    }
+  }
+
+  List<AppNotification> get notifications => notificationsEnabled
+      ? _notifications
+          .where((n) => catalogItem(n.contentTitle) != null)
+          .toList()
+      : const [];
+  Future<void> setNotificationsEnabled(bool enabled) async {
+    notificationsEnabled = enabled;
+    notifyListeners();
+    await _persistLibrary();
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    _notifications = _notifications
+        .map((n) => n.id == id
+            ? AppNotification(n.id, n.title, n.detail, n.contentTitle, true)
+            : n)
+        .toList();
+    notifyListeners();
+    await _persistLibrary();
+  }
+
+  Future<void> _detectReleases(List<CatalogItem> items) async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final uid = _authenticatedUserId() ?? _profileUserId ?? 'local';
+    if (_notificationOwner != uid) {
+      _notificationOwner = uid;
+      notificationsEnabled =
+          prefs.getBool('releaseNotificationsEnabled:$uid') ?? true;
+      try {
+        _notifications = (jsonDecode(
+                prefs.getString('releaseNotifications:$uid') ?? '[]') as List)
+            .map((n) =>
+                AppNotification.fromJson(Map<String, dynamic>.from(n as Map)))
+            .toList();
+      } catch (_) {
+        _notifications = [];
+      }
+    }
+    final key = 'knownReleases:$uid';
+    final previous = prefs.getStringList(key);
+    final known = previous?.toSet() ?? <String>{};
+    final next = <String>{};
+    for (final item in items) {
+      final id = item.id.isEmpty ? item.title : item.id;
+      final releases = {
+        id: 'Nuevo título: ${item.title}',
+        for (final e in item.episodes)
+          '$id:${e.id.isEmpty ? e.progressKey(item.title) : e.id}':
+              'Nuevo episodio: ${e.title}'
+      };
+      for (final release in releases.entries) {
+        next.add(release.key);
+        if (previous != null &&
+            !known.contains(release.key) &&
+            notificationsEnabled) {
+          _notifications.insert(
+              0,
+              AppNotification(
+                  release.key, release.value, item.title, item.title, false));
+        }
+      }
+    }
+    if (_notifications.length > 100) {
+      _notifications = _notifications.take(100).toList();
+    }
+    await prefs.setStringList(key, next.toList());
+    await _persistLibrary();
+  }
 
   Future<void> _loadProfileDetails() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
@@ -445,130 +637,6 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
-  List<HistoryEntry> get viewingHistory {
-    final entries = <HistoryEntry>[];
-    for (final entry
-        in (_watchHistory[playbackScope] ?? <String, WatchProgress>{})
-            .entries) {
-      if (catalogItem(entry.key) == null ||
-          (_hiddenHistory[playbackScope] ?? {}).contains(entry.key)) {
-        continue;
-      }
-      final p = entry.value;
-      if (p.positionMs == 0 &&
-          !(_viewedTitles[playbackScope] ?? {})
-              .contains(_parentTitle(entry.key))) {
-        continue;
-      }
-      entries.add(HistoryEntry(entry.key, p.positionMs, p.durationMs,
-          p.updatedAt, (_completed[playbackScope] ?? {}).contains(entry.key)));
-    }
-    entries.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return List.unmodifiable(entries);
-  }
-
-  Future<void> clearViewingHistory() async {
-    final keys = (_watchHistory[playbackScope] ?? {}).keys.toList();
-    for (final key in keys) {
-      final p = _watchHistory[playbackScope]![key]!;
-      await saveWatchProgress(
-          key, Duration.zero, Duration(milliseconds: p.durationMs),
-          scope: playbackScope);
-    }
-    _viewedTitles.remove(playbackScope);
-    _hiddenHistory.putIfAbsent(playbackScope, () => {}).addAll(keys);
-    _completed.remove(playbackScope);
-    notifyListeners();
-    await _persistWatchHistory();
-    await _persistLibrary();
-    unawaited(syncWatchProgress());
-  }
-
-  bool? ratingFor(String title) =>
-      _ratings[playbackScope]?[_parentTitle(title)];
-
-  Future<void> setContentRating(String title, bool? liked) async {
-    if (profileLocked || catalogItem(title) == null) return;
-    final ratings = _ratings.putIfAbsent(playbackScope, () => {});
-    if (liked == null) {
-      ratings.remove(_parentTitle(title));
-    } else {
-      ratings[_parentTitle(title)] = liked;
-    }
-    notifyListeners();
-    await _persistLibrary();
-  }
-
-  List<AppNotification> get notifications => notificationsEnabled
-      ? _notifications
-          .where((n) => catalogItem(n.contentTitle) != null)
-          .toList()
-      : const [];
-
-  Future<void> setNotificationsEnabled(bool enabled) async {
-    notificationsEnabled = enabled;
-    notifyListeners();
-    await _persistLibrary();
-  }
-
-  Future<void> markNotificationRead(String id) async {
-    _notifications = _notifications
-        .map((n) => n.id == id
-            ? AppNotification(n.id, n.title, n.detail, n.contentTitle, true)
-            : n)
-        .toList();
-    notifyListeners();
-    await _persistLibrary();
-  }
-
-  Future<void> _detectReleases(List<CatalogItem> items) async {
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
-    final uid = _authenticatedUserId() ?? _profileUserId ?? 'local';
-    if (_notificationOwner != uid) {
-      _notificationOwner = uid;
-      notificationsEnabled =
-          prefs.getBool('releaseNotificationsEnabled:$uid') ?? true;
-      try {
-        _notifications = (jsonDecode(
-                prefs.getString('releaseNotifications:$uid') ?? '[]') as List)
-            .map((n) =>
-                AppNotification.fromJson(Map<String, dynamic>.from(n as Map)))
-            .toList();
-      } catch (_) {
-        _notifications = [];
-      }
-    }
-    final key = 'knownReleases:$uid';
-    final previous = prefs.getStringList(key);
-    final known = previous?.toSet() ?? <String>{};
-    final next = <String>{};
-    for (final item in items) {
-      final id = item.id.isEmpty ? item.title : item.id;
-      final releases = {
-        id: 'Nuevo título: ${item.title}',
-        for (final e in item.episodes)
-          '$id:${e.id.isEmpty ? e.progressKey(item.title) : e.id}':
-              'Nuevo episodio: ${e.title}'
-      };
-      for (final release in releases.entries) {
-        next.add(release.key);
-        if (previous != null &&
-            !known.contains(release.key) &&
-            notificationsEnabled) {
-          _notifications.insert(
-              0,
-              AppNotification(
-                  release.key, release.value, item.title, item.title, false));
-        }
-      }
-    }
-    if (_notifications.length > 100) {
-      _notifications = _notifications.take(100).toList();
-    }
-    await prefs.setStringList(key, next.toList());
-    await _persistLibrary();
-  }
-
   void _stopProfileSync() {
     _profileGeneration++;
     _profileSubscription?.cancel();
@@ -631,6 +699,7 @@ class AppState extends ChangeNotifier {
         return;
       }
       unawaited(_flushProfiles());
+      unawaited(_flushPlaybackEvents());
     });
   }
 
@@ -673,75 +742,51 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> _persistLibrary() async {
+  Future<void> recordPlayback(String title, String genre) async {
+    if (catalogItem(title) == null || profileLocked) return;
     final prefs = _prefs ??= await SharedPreferences.getInstance();
-    for (final pair in {
-      'favoriteLists': _favoriteLists,
-      'hiddenContinue': _hiddenContinue,
-      'hiddenHistory': _hiddenHistory,
-      'completedPlayback': _completed
-    }.entries) {
-      await prefs.setString(pair.key,
-          jsonEncode(pair.value.map((k, v) => MapEntry(k, v.toList()))));
-    }
-    await prefs.setString('contentRatings', jsonEncode(_ratings));
-    final uid = _notificationOwner;
-    if (uid != null) {
-      await prefs.setString('releaseNotifications:$uid',
-          jsonEncode(_notifications.map((n) => n.toJson()).toList()));
-      await prefs.setBool(
-          'releaseNotificationsEnabled:$uid', notificationsEnabled);
-    }
+    final uid = _authenticatedUserId();
+    if (uid == null) return;
+    final key = 'playbackEvents:$uid';
+    final pending = (jsonDecode(prefs.getString(key) ?? '[]') as List);
+    pending.add({
+      'id': '${DateTime.now().microsecondsSinceEpoch}',
+      'title': title,
+      'genre': genre
+    });
+    await prefs.setString(key, jsonEncode(pending));
+    unawaited(_flushPlaybackEvents());
   }
 
-  Future<void> _loadLibrary() async {
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
-    for (final pair in {
-      'favoriteLists': _favoriteLists,
-      'hiddenContinue': _hiddenContinue,
-      'hiddenHistory': _hiddenHistory,
-      'completedPlayback': _completed
-    }.entries) {
-      pair.value.clear();
-      try {
-        final raw = jsonDecode(prefs.getString(pair.key) ?? '{}') as Map;
-        for (final entry in raw.entries) {
-          pair.value[entry.key as String] =
-              (entry.value as List).cast<String>().toSet();
-        }
-      } catch (_) {
-        pair.value.clear();
-      }
-    }
-    if (!prefs.containsKey('favoritesMigrated') &&
-        _profileUserId != null &&
-        _myList.isNotEmpty) {
-      _currentFavorites.addAll(_myList);
-      await prefs.setBool('favoritesMigrated', true);
-      await _persistLibrary();
-    }
-    _ratings.clear();
+  bool _sendingEvents = false;
+  Future<void> _flushPlaybackEvents() async {
+    final uid = _authenticatedUserId();
+    if (uid == null || Firebase.apps.isEmpty || _sendingEvents) return;
+    _sendingEvents = true;
     try {
-      final raw = jsonDecode(prefs.getString('contentRatings') ?? '{}') as Map;
-      for (final e in raw.entries) {
-        _ratings[e.key as String] = Map<String, bool>.from(e.value as Map);
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      final key = 'playbackEvents:$uid';
+      final pending = (jsonDecode(prefs.getString(key) ?? '[]') as List);
+      for (final raw in pending) {
+        if (_authenticatedUserId() != uid) return;
+        final e = Map<String, dynamic>.from(raw as Map);
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('playEvents')
+            .doc(e['id'] as String)
+            .set({
+          'title': e['title'],
+          'genre': e['genre'],
+          'createdAt': FieldValue.serverTimestamp()
+        }).timeout(const Duration(seconds: 10));
+        final latest = (jsonDecode(prefs.getString(key) ?? '[]') as List)
+          ..removeWhere((v) => v['id'] == e['id']);
+        await prefs.setString(key, jsonEncode(latest));
       }
     } catch (_) {
-      _ratings.clear();
-    }
-    final uid = _profileUserId ?? _authenticatedUserId() ?? 'local';
-    _notificationOwner = uid;
-    notificationsEnabled =
-        prefs.getBool('releaseNotificationsEnabled:$uid') ?? true;
-    try {
-      _notifications =
-          (jsonDecode(prefs.getString('releaseNotifications:$uid') ?? '[]')
-                  as List)
-              .map((e) =>
-                  AppNotification.fromJson(Map<String, dynamic>.from(e as Map)))
-              .toList();
-    } catch (_) {
-      _notifications = [];
+    } finally {
+      _sendingEvents = false;
     }
   }
 
@@ -1267,6 +1312,13 @@ class AppState extends ChangeNotifier {
       _catalogTimer = Timer.periodic(
           const Duration(minutes: 2), (_) => unawaited(refreshCatalog()));
     }
+  }
+
+  Future<List<Map<String, dynamic>>> catalogStatistics() async {
+    if (!isAdmin) {
+      throw StateError('Solo un administrador puede consultar estadísticas.');
+    }
+    return _catalogStore.statistics();
   }
 
   String _profilesKey(String userId) => 'profiles:$userId';

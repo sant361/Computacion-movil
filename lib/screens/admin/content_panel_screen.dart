@@ -58,6 +58,40 @@ class _ContentPanelScreenState extends State<ContentPanelScreen> {
     }
   }
 
+  Future<void> _delete(CatalogItem item) async {
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+                title: const Text('¿Eliminar este contenido?'),
+                content: Text(
+                    'Se retirará «${item.title}» del catálogo para todos los usuarios.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancelar')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Eliminar'))
+                ]));
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await appState.deleteCatalogItem(item);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Contenido eliminado.')));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'No se pudo eliminar. Revisa tu conexión y los permisos de tu cuenta.')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
       listenable: appState,
@@ -130,6 +164,13 @@ class _ContentPanelScreenState extends State<ContentPanelScreen> {
                                                 : () => _edit(item),
                                             icon: const Icon(
                                                 Icons.edit_outlined)),
+                                        IconButton(
+                                            tooltip: 'Eliminar ${item.title}',
+                                            onPressed: _busy
+                                                ? null
+                                                : () => _delete(item),
+                                            icon: const Icon(
+                                                Icons.delete_outline)),
                                       ])))),
                         ])),
           ));

@@ -913,6 +913,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteCatalogItem(CatalogItem item) async {
+    if (!isAdmin) {
+      throw StateError('Solo un administrador puede eliminar contenido.');
+    }
+    await _catalogStore.delete(item);
+    _catalog =
+        _catalog.where((old) => old.id != item.id || item.id.isEmpty).toList();
+    notifyListeners();
+  }
+
   String? catalogError;
   void _restoreCatalogCache(SharedPreferences prefs) {
     try {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/catalog_item.dart';
 import '../state/app_state.dart';
+import '../widgets/catalog_artwork.dart';
 import 'content_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -316,8 +317,10 @@ class _ResultCard extends StatelessWidget {
                   colors: colors)),
           child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: const Stack(fit: StackFit.expand, children: [
-                Center(
+              child: Stack(fit: StackFit.expand, children: [
+                if (item.posterUrl.isNotEmpty)
+                  CatalogArtwork(url: item.posterUrl),
+                const Center(
                     child: Icon(Icons.play_circle_fill_rounded,
                         color: Colors.white, size: 42)),
               ])),

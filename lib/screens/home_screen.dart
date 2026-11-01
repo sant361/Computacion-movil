@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../data/catalog_item.dart';
 import '../state/app_state.dart';
+import '../widgets/catalog_artwork.dart';
+import 'catalog/my_list_screen.dart';
+import 'catalog/profiles_screen.dart';
 import 'catalog/downloads_screen.dart';
 import 'catalog/notifications_screen.dart';
 import 'content_detail_screen.dart';
 import 'menu_screen.dart';
-import 'catalog/my_list_screen.dart';
-import 'catalog/profiles_screen.dart';
 import 'player_screen.dart';
 import 'payments/subscription_screen.dart';
 import 'search_screen.dart';
@@ -470,15 +471,17 @@ class _FeaturedCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
+                if (item.posterUrl.isNotEmpty)
+                  Positioned.fill(child: CatalogArtwork(url: item.posterUrl)),
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topRight,
                       end: Alignment.bottomLeft,
                       colors: [
-                        Color(0xFF267C83),
-                        Color(0xFF173B54),
-                        Color(0xFF101A31),
+                        Color(0x77267C83),
+                        Color(0xAA173B54),
+                        Color(0xEE101A31),
                       ],
                     ),
                   ),
@@ -706,6 +709,10 @@ class _PosterSection extends StatelessWidget {
                                     ),
                                   ),
                                 ),
+                                if (item.posterUrl.isNotEmpty)
+                                  Positioned.fill(
+                                      child:
+                                          CatalogArtwork(url: item.posterUrl)),
                                 Positioned(
                                   left: 11,
                                   top: 11,
@@ -832,6 +839,9 @@ class _ContinueWatchingSection extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                              if (item.posterUrl.isNotEmpty)
+                                Positioned.fill(
+                                    child: CatalogArtwork(url: item.posterUrl)),
                               Positioned(
                                   right: 0,
                                   top: 0,
@@ -942,13 +952,13 @@ class _CategoryGrid extends StatelessWidget {
                           colors: colors,
                         ),
                       ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.play_circle_fill_rounded,
-                          color: Colors.white,
-                          size: 36,
-                        ),
-                      ),
+                      child: Stack(fit: StackFit.expand, children: [
+                        if (item.posterUrl.isNotEmpty)
+                          CatalogArtwork(url: item.posterUrl),
+                        const Center(
+                            child: Icon(Icons.play_circle_fill_rounded,
+                                color: Colors.white, size: 36)),
+                      ]),
                     ),
                   ),
                 ),

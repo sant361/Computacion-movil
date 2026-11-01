@@ -66,15 +66,20 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
           final liked = _liked;
           return Scaffold(
               body: CustomScrollView(slivers: [
-            const SliverAppBar(
+            SliverAppBar(
                 expandedHeight: 240,
                 pinned: true,
                 flexibleSpace: FlexibleSpaceBar(
-                    background: ColoredBox(
-                        color: Color(0xFF132237),
-                        child: Center(
-                            child: Icon(Icons.movie_outlined,
-                                size: 64, color: Colors.white70))))),
+                    background: item.posterUrl.isNotEmpty
+                        ? Image.network(item.posterUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.movie_outlined, size: 64)))
+                        : const ColoredBox(
+                            color: Color(0xFF132237),
+                            child: Center(
+                                child: Icon(Icons.movie_outlined,
+                                    size: 64, color: Colors.white70))))),
             SliverPadding(
                 padding: const EdgeInsets.all(16),
                 sliver: SliverList(

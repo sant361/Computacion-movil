@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:streaming_app/screens/search_screen.dart';
 import 'package:streaming_app/screens/catalog/my_list_screen.dart';
 import 'package:streaming_app/state/app_state.dart';
+import 'package:streaming_app/widgets/catalog_artwork.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -57,5 +58,17 @@ void main() {
     expect(find.text('Risas en el aire'), findsNothing);
     expect(find.text('Guarda títulos desde su ficha para encontrarlos aquí.'),
         findsOneWidget);
+  });
+
+  testWidgets('una portada vacía o inválida conserva una imagen de respaldo',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+        home: SizedBox(
+            width: 100,
+            height: 100,
+            child: CatalogArtwork(url: 'archivo-no-valido'))));
+    expect(find.byIcon(Icons.movie_outlined), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }

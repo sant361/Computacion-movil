@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import '../../data/catalog_item.dart';
 import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
@@ -79,6 +80,8 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
         _avatarIcons.containsKey(details.avatar) ? details.avatar : 'person';
     final avatarUrl = TextEditingController(
         text: details.avatar.startsWith('https://') ? details.avatar : '');
+    var child = details.isChild;
+    var rating = details.maxRating;
     final form = GlobalKey<FormState>();
     final accepted = await showDialog<bool>(
         context: context,
@@ -123,6 +126,26 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                                     ? null
                                     : 'Usa una dirección HTTPS válida.';
                               }),
+                          SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Perfil infantil'),
+                              value: child,
+                              onChanged: (value) => update(() {
+                                    child = value;
+                                    if (child) rating = 'TP';
+                                  })),
+                          DropdownButtonFormField<String>(
+                              value: parentalRatings.contains(rating)
+                                  ? rating
+                                  : 'TP',
+                              decoration: const InputDecoration(
+                                  labelText: 'Clasificación máxima'),
+                              items: parentalRatings
+                                  .map((value) => DropdownMenuItem(
+                                      value: value, child: Text(value)))
+                                  .toList(),
+                              onChanged: (value) =>
+                                  update(() => rating = value ?? 'TP')),
                         ]))),
                 actions: [
                   TextButton(
@@ -142,7 +165,8 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
         avatarUrl.text.trim().isEmpty ? avatar : avatarUrl.text.trim();
     avatarUrl.dispose();
     if (accepted != true || !mounted) return;
-    await _save(() => appState.configureProfile(name, avatar: selectedAvatar));
+    await _save(() => appState.configureProfile(name,
+        avatar: selectedAvatar, isChild: child, maxRating: rating));
   }
 
   Future<void> _addProfile() async {
@@ -250,6 +274,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
             builder: (context, _) {
               final profiles = appState.profiles;
               final active = appState.activeProfile;
+              final childMode = appState.profileDetails(active ?? '').isChild;
               return Padding(
                 padding: const EdgeInsets.all(16),
                 child: ListView(
@@ -283,9 +308,12 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                           (name) => _ProfileAvatar(
                             name: name,
                             avatar: appState.profileDetails(name).avatar,
+                            isChild: appState.profileDetails(name).isChild,
                             selected: active == name,
-                            showDelete: _editMode,
-                            onEdit: _saving ? null : () => _editProfile(name),
+                            showDelete: _editMode && !childMode,
+                            onEdit: _saving || childMode
+                                ? null
+                                : () => _editProfile(name),
                             onTap: _saving || _editMode
                                 ? null
                                 : () => _selectProfile(name),
@@ -296,13 +324,13 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                         _ProfileAvatar(
                           name: 'Agregar',
                           isAdd: true,
-                          onTap: _saving ? null : _addProfile,
+                          onTap: _saving || childMode ? null : _addProfile,
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
                     OutlinedButton(
-                      onPressed: _saving
+                      onPressed: _saving || childMode
                           ? null
                           : () => setState(() => _editMode = !_editMode),
                       child: Text(_editMode ? 'Listo' : 'Gestionar perfiles'),
@@ -329,6 +357,7 @@ class _ProfileAvatar extends StatelessWidget {
   final bool isAdd;
   final bool showDelete;
   final String avatar;
+  final bool isChild;
   final VoidCallback? onEdit;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
@@ -341,6 +370,7 @@ class _ProfileAvatar extends StatelessWidget {
     this.isAdd = false,
     this.showDelete = false,
     this.avatar = 'initials',
+    this.isChild = false,
     this.onEdit,
   });
 
@@ -450,6 +480,10 @@ class _ProfileAvatar extends StatelessWidget {
                               selected ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
+                      if (!isAdd && isChild)
+                        const Text('Infantil',
+                            style:
+                                TextStyle(fontSize: 11, color: Colors.white70)),
                       if (selected && !isAdd)
                         const Text(
                           'Perfil activo',

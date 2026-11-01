@@ -9,6 +9,14 @@ List<CatalogEpisode> orderedEpisodes(CatalogItem item) {
   return episodes;
 }
 
+CatalogEpisode? nextEpisode(CatalogItem item, CatalogEpisode? current) {
+  if (current == null) return null;
+  final episodes = orderedEpisodes(item);
+  final index = episodes.indexWhere((episode) =>
+      episode.progressKey(item.title) == current.progressKey(item.title));
+  return index >= 0 && index + 1 < episodes.length ? episodes[index + 1] : null;
+}
+
 bool isPlayableUrl(String value) {
   final uri = Uri.tryParse(value.trim());
   return uri != null &&

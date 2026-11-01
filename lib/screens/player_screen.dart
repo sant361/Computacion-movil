@@ -11,9 +11,11 @@ class PlayerScreen extends StatefulWidget {
       {super.key,
       this.contentTitle = 'Serie · Temporada 1',
       this.episode,
+      this.trailer = false,
       this.controllerFactory});
   final String contentTitle;
   final CatalogEpisode? episode;
+  final bool trailer;
   final VideoPlayerController Function(Uri)? controllerFactory;
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -55,7 +57,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _accessError = 'Este contenido no está disponible para este perfil.';
       return;
     }
-    if (item.episodes.isNotEmpty) {
+    if (!widget.trailer && item.episodes.isNotEmpty) {
       final requested = widget.episode;
       final episodes = orderedEpisodes(item);
       if (requested != null) {
@@ -111,11 +113,14 @@ class _PlayerScreenState extends State<PlayerScreen>
   Future<void> _openVideo() async {
     final item = _item;
     if (item == null) return;
-    final source = _episode?.videoUrl ?? item.videoUrl;
+    final source = widget.trailer
+        ? item.trailerUrl
+        : (_episode?.videoUrl ?? item.videoUrl);
     if (!isPlayableUrl(source)) {
       if (mounted) {
-        setState(
-            () => _error = 'Este título todavía no tiene un video disponible.');
+        setState(() => _error = widget.trailer
+            ? 'Este título todavía no tiene un tráiler disponible.'
+            : 'Este título todavía no tiene un video disponible.');
       }
       return;
     }
@@ -125,7 +130,9 @@ class _PlayerScreenState extends State<PlayerScreen>
     _controller = controller;
     controller.addListener(_onPlaybackChanged);
     try {
-      final saved = await appState.prepareWatchProgress(_progressKey);
+      final saved = widget.trailer
+          ? null
+          : await appState.prepareWatchProgress(_progressKey);
       if (!mounted || generation != _generation) return;
       await controller.initialize().timeout(const Duration(seconds: 20));
       if (!mounted || generation != _generation) return;
@@ -177,6 +184,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _completionHandled = true;
       unawaited(_saveProgress(sync: true));
       if (_autoplay &&
+          !widget.trailer &&
           nextEpisode(_item!, _episode) != null &&
           _accessError == null) {
         unawaited(_playNext());
@@ -187,7 +195,10 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   Future<void> _saveProgress({bool sync = false}) async {
     final controller = _controller;
-    if (!_ready || controller == null || !controller.value.isInitialized) {
+    if (!_ready ||
+        widget.trailer ||
+        controller == null ||
+        !controller.value.isInitialized) {
       return;
     }
     try {
@@ -199,7 +210,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Future<void> _playNext() async {
-    if (_switching || !_canControl) return;
+    if (_switching || !_canControl || widget.trailer) return;
     final next = nextEpisode(_item!, _episode);
     if (next == null) return;
     if (_fullscreenOpen) {
@@ -297,7 +308,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     final item = _item;
     final next = item == null ? null : nextEpisode(item, _episode);
     return Scaffold(
-      appBar: AppBar(title: Text(_episode?.title ?? widget.contentTitle)),
+      appBar: AppBar(
+          title: Text(widget.trailer
+              ? 'Tráiler de ${widget.contentTitle}'
+              : _episode?.title ?? widget.contentTitle)),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         AspectRatio(
             aspectRatio: ready ? controller.value.aspectRatio : 16 / 9,
@@ -362,7 +376,7 @@ class _PlayerScreenState extends State<PlayerScreen>
               icon: const Icon(Icons.fullscreen),
               onPressed: ready ? _fullscreen : null),
         ]),
-        ...[
+        if (!widget.trailer) ...[
           SwitchListTile(
               title: const Text(
                   'Reproducir el siguiente episodio automáticamente'),

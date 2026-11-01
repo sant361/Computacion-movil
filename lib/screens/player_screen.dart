@@ -29,7 +29,6 @@ class _PlayerScreenState extends State<PlayerScreen>
   late final String _playbackScope;
   bool _autoplay = true;
   bool _ready = false;
-  bool? _liked;
   bool _switching = false;
   bool _completionHandled = false;
   bool _wasPlaying = false;
@@ -404,20 +403,27 @@ class _PlayerScreenState extends State<PlayerScreen>
           Row(children: [
             IconButton(
                 tooltip: 'Me gusta',
-                icon: Icon(
-                    _liked == true ? Icons.thumb_up : Icons.thumb_up_outlined),
+                icon: Icon(appState.ratingFor(widget.contentTitle) == true
+                    ? Icons.thumb_up
+                    : Icons.thumb_up_outlined),
                 onPressed: _accessError == null
-                    ? () =>
-                        setState(() => _liked = _liked == true ? null : true)
+                    ? () => appState.setContentRating(
+                        widget.contentTitle,
+                        appState.ratingFor(widget.contentTitle) == true
+                            ? null
+                            : true)
                     : null),
             IconButton(
                 tooltip: 'No me gusta',
-                icon: Icon(_liked == false
+                icon: Icon(appState.ratingFor(widget.contentTitle) == false
                     ? Icons.thumb_down
                     : Icons.thumb_down_outlined),
                 onPressed: _accessError == null
-                    ? () =>
-                        setState(() => _liked = _liked == false ? null : false)
+                    ? () => appState.setContentRating(
+                        widget.contentTitle,
+                        appState.ratingFor(widget.contentTitle) == false
+                            ? null
+                            : false)
                     : null),
             const Spacer(),
             OutlinedButton.icon(

@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function admin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    match /admins/{uid} {
+      allow get: if owner(uid);
+      allow list, write: if false;
+    }
+    match /catalog/{contentId} {
+      allow read: if signedIn();
+      allow create, update: if admin()
+        && request.resource.data.title is string
+        && request.resource.data.genre is string
+        && request.resource.data.year is int
+        && request.resource.data.durationMinutes is int;
+      allow delete: if admin();
+    }
+    match /users/{uid}/profiles/{profileId} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['name','avatar','isChild','maxRating','pinHash','pinSalt','updatedAt','deleted'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.avatar is string && request.resource.data.avatar.size() <= 2000
+        && request.resource.data.isChild is bool
+        && request.resource.data.maxRating in ['TP','+14','+18']
+        && request.resource.data.pinHash is string && request.resource.data.pinSalt is string
+        && request.resource.data.updatedAt is int && request.resource.data.updatedAt >= 0
+        && request.resource.data.deleted is bool;
+    }
+    match /users/{uid}/watchProgress/{progressId} {
+      function valid() {
+        let p = request.resource.data;
+        return p.keys().hasOnly(['profile','title','positionMs','durationMs','updatedAt'])
+          && p.profile is string && p.title is string
+          && p.positionMs is int && p.durationMs is int && p.updatedAt is int
+          && p.positionMs >= 0 && p.durationMs > p.positionMs && p.updatedAt >= 0;
+      }
+      allow read: if owner(uid);
+      allow create: if owner(uid) && valid();
+      allow update: if owner(uid) && valid() && request.resource.data.updatedAt >= resource.data.updatedAt;
+    }
+    match /users/{uid}/playEvents/{eventId} {
+      allow create: if owner(uid)
+        && request.resource.data.keys().hasOnly(['title','genre','createdAt'])
+        && request.resource.data.title is string && request.resource.data.title.size() <= 300
+        && request.resource.data.genre is string && request.resource.data.genre.size() <= 100
+        && request.resource.data.createdAt == request.time;
+      allow read: if owner(uid) || admin();
+    }
+    match /{path=**}/playEvents/{eventId} {
+      allow read: if admin();
+    }
+  }
+}

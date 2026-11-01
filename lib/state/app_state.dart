@@ -294,7 +294,12 @@ class AppState extends ChangeNotifier {
     unawaited(syncWatchProgress());
   }
 
-  bool get profileLocked => false;
+  bool get profileLocked =>
+      _selectionRequired ||
+      (_activeProfile != null &&
+          (profileDetails(_activeProfile!).deleted ||
+              (profileDetails(_activeProfile!).hasPin &&
+                  !_unlockedProfiles.contains(_activeProfile))));
 
   ProfileDetails profileDetails(String name) =>
       _profileData[_profileUserId]?[name] ??
@@ -373,10 +378,14 @@ class AppState extends ChangeNotifier {
       throw ArgumentError('El PIN debe tener de 4 a 6 dígitos.');
     }
     final willBeChild = isChild ?? old.isChild;
-    if (willBeChild &&
-        !_profiles
-            .any((other) => other != name && !profileDetails(other).isChild)) {
-      throw StateError('Conserva un perfil adulto para gestionar la cuenta.');
+    final removingAdultPin = !old.isChild && old.hasPin && pin == '';
+    if ((willBeChild || removingAdultPin) &&
+        !_profiles.any((other) =>
+            other != name &&
+            !profileDetails(other).isChild &&
+            profileDetails(other).hasPin)) {
+      throw StateError(
+          'Conserva un perfil adulto con PIN antes de activar un perfil infantil.');
     }
     var hash = old.pinHash, salt = old.pinSalt;
     if (pin != null) {
@@ -1052,9 +1061,26 @@ class AppState extends ChangeNotifier {
   }
 
   /// Marca [name] como el perfil que se está usando ahora mismo.
-  Future<void> setActiveProfile(String name) async {
+  Future<void> setActiveProfile(String name, {String? pin}) async {
     if (!_profiles.contains(name)) return;
+    final target = profileDetails(name);
+    final fromChild =
+        _leavingChild || profileDetails(_activeProfile ?? '').isChild;
+    if (target.hasPin && !(await verifyProfilePin(name, pin ?? ''))) {
+      throw StateError('El PIN no es correcto.');
+    }
+    if (fromChild && !target.isChild && !target.hasPin) {
+      throw StateError('El perfil adulto debe tener un PIN.');
+    }
+    if (target.isChild &&
+        !_profiles.any(
+            (n) => !profileDetails(n).isChild && profileDetails(n).hasPin)) {
+      throw StateError('Configura primero un PIN en un perfil adulto.');
+    }
     _activeProfile = name;
+    _selectionRequired = false;
+    _leavingChild = false;
+    _unlockedProfiles.add(name);
     notifyListeners();
     await _persistProfiles();
   }

@@ -409,6 +409,12 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                       const LinearProgressIndicator(
                         semanticsLabel: 'Guardando cambios',
                       ),
+                    if (appState.profileSyncError != null) ...[
+                      Text(appState.profileSyncError!),
+                      TextButton(
+                          onPressed: appState.retryProfileSync,
+                          child: const Text('Reintentar sincronización')),
+                    ],
                     if (_error != null) ...[
                       Text(
                         _error!,

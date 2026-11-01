@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/catalog_item.dart';
 import '../services/progress_store.dart';
 import '../services/catalog_store.dart';
+import '../services/profile_store.dart';
 import '../data/profile_details.dart';
 export '../data/profile_details.dart';
 
@@ -25,9 +26,11 @@ class AppState extends ChangeNotifier {
   AppState(
       {ProgressStore? progressStore,
       CatalogStore? catalogStore,
+      ProfileStore? profileStore,
       Future<bool> Function(String)? adminStatus,
       String? Function()? authenticatedUserId})
-      : _catalogStore = catalogStore ?? FirestoreCatalogStore(),
+      : _profileStore = profileStore ?? FirestoreProfileStore(),
+        _catalogStore = catalogStore ?? FirestoreCatalogStore(),
         _adminStatus = adminStatus,
         _progressStore = progressStore ?? FirestoreProgressStore(),
         _authenticatedUserId = authenticatedUserId ?? _firebaseUserId;
@@ -219,6 +222,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _stopProgressSync();
+    _stopProfileSync();
     _catalogTimer?.cancel();
     super.dispose();
   }
@@ -236,6 +240,12 @@ class AppState extends ChangeNotifier {
   List<AppNotification> _notifications = [];
   String? _notificationOwner;
   bool notificationsEnabled = true;
+  final ProfileStore _profileStore;
+  StreamSubscription<List<ProfileDetails>>? _profileSubscription;
+  Timer? _profileTimer;
+  int _profileGeneration = 0;
+  bool _profileWriting = false, _profileReadFailed = false;
+  String? profileSyncError;
 
   String _parentTitle(String key) {
     for (final item in _catalog) {
@@ -338,6 +348,9 @@ class AppState extends ChangeNotifier {
               maxRating: name == 'Kids' ? 'TP' : '+18'));
     }
     _profileData[uid] = result;
+    _pendingProfiles
+      ..clear()
+      ..addAll(prefs.getStringList('pendingProfiles:$uid') ?? []);
   }
 
   Future<void> _persistProfileDetails() async {
@@ -364,6 +377,7 @@ class AppState extends ChangeNotifier {
     _profileData.putIfAbsent(uid, () => {})[profile.name] = profile;
     _pendingProfiles.add(profile.name);
     await _persistProfileDetails();
+    unawaited(_flushProfiles());
   }
 
   Future<void> configureProfile(String name,
@@ -553,6 +567,110 @@ class AppState extends ChangeNotifier {
     }
     await prefs.setStringList(key, next.toList());
     await _persistLibrary();
+  }
+
+  void _stopProfileSync() {
+    _profileGeneration++;
+    _profileSubscription?.cancel();
+    _profileSubscription = null;
+    _profileTimer?.cancel();
+    profileSyncError = null;
+  }
+
+  void _startProfileSync() {
+    _stopProfileSync();
+    final uid = _profileUserId;
+    if (uid == null ||
+        uid != _authenticatedUserId() ||
+        (Firebase.apps.isEmpty && _profileStore is FirestoreProfileStore)) {
+      return;
+    }
+    final generation = _profileGeneration;
+    _profileReadFailed = false;
+    _profileSubscription = _profileStore.watch(uid).listen((remote) {
+      if (generation != _profileGeneration || uid != _authenticatedUserId()) {
+        return;
+      }
+      final previousWasChild =
+          profileDetails(_activeProfile ?? '').isChild || _leavingChild;
+      final records = _profileData.putIfAbsent(uid, () => {});
+      for (final p in remote) {
+        final old = records[p.name];
+        if (old == null || p.updatedAt >= old.updatedAt) {
+          if (old?.pinHash != p.pinHash) _unlockedProfiles.remove(p.name);
+          records[p.name] = p;
+          _pendingProfiles.remove(p.name);
+        }
+      }
+      for (final p in records.values) {
+        if (p.updatedAt == 0 && !remote.any((r) => r.name == p.name)) {
+          _pendingProfiles.add(p.name);
+        }
+      }
+      _profiles =
+          records.values.where((p) => !p.deleted).map((p) => p.name).toList();
+      if (!_profiles.contains(_activeProfile)) {
+        _leavingChild = previousWasChild;
+        _selectionRequired = true;
+        _activeProfile = null;
+      }
+      profileSyncError = null;
+      notifyListeners();
+      unawaited(_persistProfileDetails());
+      unawaited(_flushProfiles());
+    }, onError: (Object e) {
+      if (generation == _profileGeneration) {
+        _profileReadFailed = true;
+        profileSyncError = 'No se pudieron sincronizar los perfiles.';
+        notifyListeners();
+      }
+    });
+    _profileTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_profileReadFailed) {
+        _startProfileSync();
+        return;
+      }
+      unawaited(_flushProfiles());
+    });
+  }
+
+  Future<void> retryProfileSync() async {
+    _startProfileSync();
+  }
+
+  Future<void> _flushProfiles() async {
+    final uid = _profileUserId;
+    if (uid == null ||
+        uid != _authenticatedUserId() ||
+        _profileWriting ||
+        (Firebase.apps.isEmpty && _profileStore is FirestoreProfileStore)) {
+      return;
+    }
+    _profileWriting = true;
+    final generation = _profileGeneration;
+    try {
+      for (final name in _pendingProfiles.toList()) {
+        if (generation != _profileGeneration || uid != _authenticatedUserId()) {
+          return;
+        }
+        final p = _profileData[uid]?[name];
+        if (p == null) continue;
+        await _profileStore.write(uid, p);
+        if (generation != _profileGeneration) return;
+        if (identical(_profileData[uid]?[name], p)) {
+          _pendingProfiles.remove(name);
+        }
+      }
+      profileSyncError = null;
+      await _persistProfileDetails();
+    } catch (_) {
+      if (generation == _profileGeneration) {
+        profileSyncError = 'Perfiles guardados aquí. Sincronización pendiente.';
+      }
+    } finally {
+      _profileWriting = false;
+      if (generation == _profileGeneration) notifyListeners();
+    }
   }
 
   Future<void> _persistLibrary() async {
@@ -907,6 +1025,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> logout() async {
     _stopProgressSync();
+    _stopProfileSync();
     _catalogTimer?.cancel();
     _unlockedProfiles.clear();
     _selectionRequired = false;
@@ -1157,6 +1276,7 @@ class AppState extends ChangeNotifier {
   /// Si es la primera vez, crea los 3 perfiles de muestra de siempre
   /// para que la pantalla no empiece vacía.
   Future<void> loadProfiles(String userId) async {
+    _stopProfileSync();
     _stopProgressSync();
     final changingUser = _profileUserId != userId;
     if (changingUser) _unlockedProfiles.clear();
@@ -1172,6 +1292,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     await _persistProfiles();
     _startProgressSync();
+    _startProfileSync();
   }
 
   String _parentalKey(String userId) => 'parental:$userId';

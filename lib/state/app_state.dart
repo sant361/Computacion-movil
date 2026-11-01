@@ -224,6 +224,7 @@ class AppState extends ChangeNotifier {
   final CatalogStore _catalogStore;
   final Future<bool> Function(String)? _adminStatus;
   Timer? _catalogTimer;
+  final Map<String, Set<String>> _favoriteLists = {};
 
   String _parentTitle(String key) {
     for (final item in _catalog) {
@@ -257,6 +258,44 @@ class AppState extends ChangeNotifier {
           .updatedAt
           .compareTo(watchProgress(a.progressKey(item.title))!.updatedAt));
     return rows.isEmpty ? null : rows.first;
+  }
+
+  Set<String> get _currentFavorites => _profileUserId == null
+      ? _myList
+      : _favoriteLists.putIfAbsent(playbackScope, () => {});
+
+  List<String> get myListTitles =>
+      _currentFavorites.where((t) => catalogItem(t) != null).toList();
+
+  Future<void> _persistLibrary() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    for (final pair in {'favoriteLists': _favoriteLists}.entries) {
+      await prefs.setString(pair.key,
+          jsonEncode(pair.value.map((k, v) => MapEntry(k, v.toList()))));
+    }
+  }
+
+  Future<void> _loadLibrary() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    for (final pair in {'favoriteLists': _favoriteLists}.entries) {
+      pair.value.clear();
+      try {
+        final raw = jsonDecode(prefs.getString(pair.key) ?? '{}') as Map;
+        for (final e in raw.entries) {
+          pair.value[e.key as String] =
+              (e.value as List).cast<String>().toSet();
+        }
+      } catch (_) {
+        pair.value.clear();
+      }
+    }
+    if (!prefs.containsKey('favoritesMigrated') &&
+        _profileUserId != null &&
+        _myList.isNotEmpty) {
+      _currentFavorites.addAll(_myList);
+      await prefs.setBool('favoritesMigrated', true);
+      await _persistLibrary();
+    }
   }
 
   static const _tokenBalanceKey = 'tokenBalance';
@@ -329,6 +368,7 @@ class AppState extends ChangeNotifier {
     _pendingProgress.putIfAbsent(scope, () => {}).add(title);
     notifyListeners();
     await _persistWatchHistory();
+    await _persistLibrary();
   }
 
   void _loadWatchHistory(SharedPreferences prefs) {
@@ -449,7 +489,8 @@ class AppState extends ChangeNotifier {
       List.unmodifiable(_tokenHistory);
 
   final Set<String> _myList = {};
-  bool isInMyList(String contentTitle) => _myList.contains(contentTitle);
+  bool isInMyList(String contentTitle) =>
+      _currentFavorites.contains(contentTitle);
 
   // Descargas: por simplicidad se marcan como completas al instante
   // (no hay una descarga real en progreso, es solo para la demo).
@@ -463,6 +504,7 @@ class AppState extends ChangeNotifier {
     _prefs = await SharedPreferences.getInstance();
     _restoreCatalogCache(_prefs!);
     _loadWatchHistory(_prefs!);
+    await _loadLibrary();
     _tokenBalance = _prefs!.getInt(_tokenBalanceKey) ?? _tokenBalance;
     _isLoggedIn = _prefs!.getBool(_isLoggedInKey) ?? false;
     _languageCode = _prefs!.getString(_languageCodeKey) ?? _languageCode;
@@ -547,13 +589,14 @@ class AppState extends ChangeNotifier {
   }
 
   void toggleMyList(String contentTitle) {
-    if (_myList.contains(contentTitle)) {
-      _myList.remove(contentTitle);
+    if (_currentFavorites.contains(contentTitle)) {
+      _currentFavorites.remove(contentTitle);
     } else {
-      _myList.add(contentTitle);
+      _currentFavorites.add(contentTitle);
     }
     notifyListeners();
-    _persist();
+    unawaited(_persistLibrary());
+    if (_profileUserId == null) unawaited(_persist());
   }
 
   /// Cambia el idioma de la app si [code] es uno de los soportados
@@ -728,6 +771,7 @@ class AppState extends ChangeNotifier {
   /// Si es la primera vez, crea los 3 perfiles de muestra de siempre
   /// para que la pantalla no empiece vacía.
   Future<void> loadProfiles(String userId) async {
+    _stopProgressSync();
     _profileUserId = userId;
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     _loadWatchHistory(prefs);
@@ -735,6 +779,7 @@ class AppState extends ChangeNotifier {
         prefs.getStringList(_profilesKey(userId)) ?? ['Ana', 'Luis', 'Kids'];
     _activeProfile = prefs.getString(_activeProfileKey(userId)) ??
         (_profiles.isNotEmpty ? _profiles.first : null);
+    await _loadLibrary();
     notifyListeners();
     await _persistProfiles();
     _startProgressSync();

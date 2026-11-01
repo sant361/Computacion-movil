@@ -6,6 +6,7 @@ import 'catalog/downloads_screen.dart';
 import 'catalog/notifications_screen.dart';
 import 'content_detail_screen.dart';
 import 'menu_screen.dart';
+import 'catalog/my_list_screen.dart';
 import 'player_screen.dart';
 import 'payments/subscription_screen.dart';
 import 'search_screen.dart';
@@ -107,6 +108,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   screen = const MenuScreen();
                 case 'notifications':
                   screen = const NotificationsScreen();
+                case 'mylist':
+                  screen = const MyListScreen();
                 case 'tokens':
                   screen = const TokensScreen();
                 default:
@@ -123,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 value: 'notifications',
                 child: Text('Notificaciones'),
               ),
+              PopupMenuItem(value: 'mylist', child: Text('Mi lista')),
               PopupMenuItem(value: 'tokens', child: Text('Mis tokens')),
               PopupMenuItem(
                 value: 'subscription',

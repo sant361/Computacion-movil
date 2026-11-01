@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:streaming_app/screens/search_screen.dart';
+import 'package:streaming_app/screens/catalog/my_list_screen.dart';
 import 'package:streaming_app/state/app_state.dart';
 
 void main() {
@@ -38,5 +39,23 @@ void main() {
         scrollable: find.byType(Scrollable).first);
     expect(find.text('0 títulos'), findsOneWidget);
     expect(find.text('No encontramos títulos'), findsOneWidget);
+  });
+
+  testWidgets('Mi lista cambia con el perfil y permite quitar favoritos',
+      (tester) async {
+    await appState.loadProfiles('favoritos-ui');
+    appState.toggleMyList('Risas en el aire');
+    await tester.pumpWidget(const MaterialApp(home: MyListScreen()));
+    expect(find.text('Risas en el aire'), findsOneWidget);
+    await appState.setActiveProfile('Luis');
+    await tester.pump();
+    expect(find.text('Risas en el aire'), findsNothing);
+    await appState.setActiveProfile('Ana');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Quitar Risas en el aire de Mi lista'));
+    await tester.pump();
+    expect(find.text('Risas en el aire'), findsNothing);
+    expect(find.text('Guarda títulos desde su ficha para encontrarlos aquí.'),
+        findsOneWidget);
   });
 }

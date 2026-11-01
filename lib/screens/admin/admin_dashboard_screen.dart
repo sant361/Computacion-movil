@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../state/app_state.dart';
 import 'content_panel_screen.dart';
 import 'users_roles_screen.dart';
 import 'plans_panel_screen.dart';
@@ -12,13 +13,28 @@ class AdminDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!appState.isAdmin) {
+      return Scaffold(
+          appBar: AppBar(title: const Text('Panel de administrador')),
+          body: const Center(
+              child:
+                  Text('Esta sección está disponible para administradores.')));
+    }
     final items = [
       ('Contenido', Icons.movie_outlined, const ContentPanelScreen()),
       ('Usuarios y roles', Icons.group_outlined, const UsersRolesScreen()),
       ('Planes', Icons.card_membership_outlined, const PlansPanelScreen()),
-      ('Promociones', Icons.local_offer_outlined, const PromotionsPanelScreen()),
+      (
+        'Promociones',
+        Icons.local_offer_outlined,
+        const PromotionsPanelScreen()
+      ),
       ('Analítica', Icons.bar_chart, const AnalyticsPanelScreen()),
-      ('Región y seguridad', Icons.security_outlined, const RegionSecurityScreen()),
+      (
+        'Región y seguridad',
+        Icons.security_outlined,
+        const RegionSecurityScreen()
+      ),
     ];
 
     return Scaffold(

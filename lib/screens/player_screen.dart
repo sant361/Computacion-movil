@@ -32,6 +32,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _autoplay = true;
   bool _ready = false;
   bool _switching = false;
+  bool _recorded = false;
   bool _completionHandled = false;
   bool _wasPlaying = false;
   bool _fullscreenOpen = false;
@@ -174,6 +175,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       _error =
           'La reproducción se interrumpió. Revisa tu conexión y vuelve a intentarlo.';
     }
+    if (_ready && controller.value.isPlaying && !_recorded && !widget.trailer) {
+      _recorded = true;
+      unawaited(appState.recordPlayback(_item!.title, _item!.genre));
+    }
     final stopped = _wasPlaying && !controller.value.isPlaying;
     _wasPlaying = controller.value.isPlaying;
     if (_ready && stopped) unawaited(_saveProgress(sync: true));
@@ -241,6 +246,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _episode = next;
       _controller = null;
       _ready = false;
+      _recorded = false;
       _completionHandled = false;
       _wasPlaying = false;
       _lastSavedSecond = -1;

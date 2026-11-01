@@ -89,3 +89,63 @@ en memoria. La prueba real requiere dos dispositivos autenticados contra el
 mismo proyecto y las reglas anteriores publicadas: avanza un título, pausa y
 abre ese perfil en el segundo dispositivo; repite sin conexión y al reconectar.
 No se ejecutó una prueba con cuentas reales ni un despliegue de reglas.
+
+## Catálogo, reproducción y biblioteca
+
+Las pantallas existentes ahora admiten videos por título, temporadas y episodios,
+reproducción automática del siguiente capítulo, tráileres, portadas, subtítulos
+SRT/WebVTT y temporizador. Los archivos multimedia se configuran desde
+Administración → Contenido, usando enlaces HTTP(S) accesibles al dispositivo.
+En web, el servidor de archivos debe permitir CORS. Los títulos de muestra no
+se sustituyen por películas ajenas: si falta la URL se informa en el reproductor.
+Los enlaces de un servicio que requiera DRM o autorización adicional necesitan
+una integración específica; pegar la URL de una página no equivale a un video.
+
+El editor conserva los identificadores de Firestore y permite modificar o
+eliminar contenido, además de editar episodios con su temporada y número.
+Los episodios guardan avances independientes. El buscador mantiene los filtros
+por género, año, idioma y duración y la búsqueda de títulos sin acentos.
+
+Los favoritos, valoraciones, historial y preferencias se guardan por cuenta y
+perfil. La sección Seguir viendo permite quitar títulos; el historial puede
+borrarse con confirmación. Las valoraciones influyen en las recomendaciones.
+El historial visible borrado, favoritos y valoraciones son locales al dispositivo;
+la posición de reproducción y los metadatos de perfiles sí se sincronizan.
+
+Los perfiles admiten avatar por icono o URL HTTPS y clasificación infantil.
+Un perfil infantil solo muestra contenido permitido y no administra perfiles,
+catálogo ni controles parentales. Antes de entrar en él hay que configurar un
+adulto con PIN, para poder volver de forma segura. El PIN de 4 a 6 dígitos se
+almacena como derivación PBKDF2 con sal; cinco errores bloquean nuevos intentos
+30 segundos en ese dispositivo. El PIN es una protección dentro de la app,
+no una segunda identidad de Firebase ni un control DRM. No compartas las
+credenciales de Firebase con usuarios que deban tener permisos diferentes.
+
+Los perfiles y avatares se sincronizan en `users/{uid}/profiles`, con pendientes
+locales y reintentos. Los estrenos y capítulos nuevos se detectan al actualizar
+el catálogo (al entrar y cada dos minutos mientras se usa la app). Los avisos
+aparecen en el centro de notificaciones, con lectura y preferencia persistentes;
+no son notificaciones push del sistema cuando la app está cerrada.
+
+Cada inicio real de reproducción registra un evento en
+`users/{uid}/playEvents`; no se cuentan los tráileres. La sección Analítica
+agrupa estos eventos reales por título y género. Solo las cuentas con documento
+`admins/{uid}` pueden consultar el conjunto de eventos o editar el catálogo.
+Los eventos pendientes se reintentan al recuperar acceso a Firebase.
+
+### Configuración pendiente del proyecto Firebase
+
+`firebase/firestore.rules` contiene reglas para catálogo, perfiles, progreso y
+estadísticas. Revisa e integra estas reglas en el proyecto `streaming-app-e0850`
+sin perder reglas de otras funciones que ya utilices. No hay credenciales de
+despliegue administrativo en esta sesión y las reglas no se han publicado.
+El alta de administradores se realiza desde un entorno administrativo confiable;
+la app no puede concederse ese permiso.
+
+Para verificar la integración real, publica las reglas, configura títulos con
+URLs propias y usa dos dispositivos con la misma cuenta: crea un perfil, cambia
+su avatar y comprueba la sincronización; reproduce un episodio, pausa y retómalo
+en el otro dispositivo. Comprueba también que un infantil no puede abrir un
+título restringido o gestionar perfiles, y que otra cuenta no ve esos datos.
+Las pruebas automatizadas usan almacenes y reproductor simulados, no cuentas
+reales ni descargas completas de archivos multimedia.

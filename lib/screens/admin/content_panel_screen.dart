@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/catalog_item.dart';
 import '../../state/app_state.dart';
 import 'catalog_editor_screen.dart';
+import 'analytics_panel_screen.dart';
 
 class ContentPanelScreen extends StatefulWidget {
   const ContentPanelScreen({super.key});
@@ -98,6 +99,13 @@ class _ContentPanelScreenState extends State<ContentPanelScreen> {
       builder: (context, _) => Scaffold(
             appBar: AppBar(title: const Text('Contenido'), actions: [
               if (appState.isAdmin) ...[
+                IconButton(
+                    tooltip: 'Estadísticas',
+                    icon: const Icon(Icons.bar_chart),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const AnalyticsPanelScreen()))),
                 TextButton(
                     onPressed: _busy ? null : () => _edit(),
                     child: const Text('Nuevo')),

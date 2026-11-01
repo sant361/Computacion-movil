@@ -25,11 +25,14 @@ class _PlayerScreenState extends State<PlayerScreen>
   CatalogItem? _item;
   CatalogEpisode? _episode;
   late final String _playbackScope;
+  bool _autoplay = true;
   bool _ready = false;
   bool? _liked;
   bool _switching = false;
+  bool _completionHandled = false;
   bool _wasPlaying = false;
   bool _fullscreenOpen = false;
+  bool _nextPending = false;
   int _lastSavedSecond = -1;
   int _generation = 0;
   String? _error;
@@ -160,6 +163,25 @@ class _PlayerScreenState extends State<PlayerScreen>
       _lastSavedSecond = second;
       unawaited(_saveProgress());
     }
+    final duration = controller.value.duration;
+    if (_completionHandled &&
+        !_switching &&
+        controller.value.position <
+            duration - const Duration(milliseconds: 500)) {
+      _completionHandled = false;
+    }
+    if (_ready &&
+        !_completionHandled &&
+        duration > Duration.zero &&
+        controller.value.position >= duration) {
+      _completionHandled = true;
+      unawaited(_saveProgress(sync: true));
+      if (_autoplay &&
+          nextEpisode(_item!, _episode) != null &&
+          _accessError == null) {
+        unawaited(_playNext());
+      }
+    }
     setState(() {});
   }
 
@@ -174,6 +196,35 @@ class _PlayerScreenState extends State<PlayerScreen>
           scope: _playbackScope);
       if (sync) unawaited(appState.syncWatchProgress());
     } catch (_) {}
+  }
+
+  Future<void> _playNext() async {
+    if (_switching || !_canControl) return;
+    final next = nextEpisode(_item!, _episode);
+    if (next == null) return;
+    if (_fullscreenOpen) {
+      _nextPending = true;
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() => _switching = true);
+    await _saveProgress(sync: true);
+    if (!mounted) return;
+    final old = _controller;
+    old?.removeListener(_onPlaybackChanged);
+    if (old != null) unawaited(old.dispose());
+    if (!mounted) return;
+    setState(() {
+      _episode = next;
+      _controller = null;
+      _ready = false;
+      _completionHandled = false;
+      _wasPlaying = false;
+      _lastSavedSecond = -1;
+      _error = null;
+      _switching = false;
+    });
+    await _openVideo();
   }
 
   Future<void> _retry() async {
@@ -205,6 +256,10 @@ class _PlayerScreenState extends State<PlayerScreen>
             fullscreenDialog: true));
     _fullscreenOpen = false;
     if (!mounted) return;
+    if (_nextPending) {
+      _nextPending = false;
+      await _playNext();
+    }
   }
 
   void _seekBy(Duration offset) {
@@ -239,6 +294,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     final controller = _controller;
     final ready = _canControl && controller != null;
     final error = _accessError ?? _error;
+    final item = _item;
+    final next = item == null ? null : nextEpisode(item, _episode);
     return Scaffold(
       appBar: AppBar(title: Text(_episode?.title ?? widget.contentTitle)),
       body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -306,12 +363,23 @@ class _PlayerScreenState extends State<PlayerScreen>
               onPressed: ready ? _fullscreen : null),
         ]),
         ...[
+          SwitchListTile(
+              title: const Text(
+                  'Reproducir el siguiente episodio automáticamente'),
+              value: _autoplay,
+              onChanged: (value) => setState(() => _autoplay = value)),
+          if (next != null)
+            OutlinedButton.icon(
+                onPressed: ready ? _playNext : null,
+                icon: const Icon(Icons.skip_next),
+                label: Text('Siguiente: ${next.title}')),
           TextButton.icon(
               icon: const Icon(Icons.replay),
               label: const Text('Ver desde inicio'),
               onPressed: ready
                   ? () async {
                       await controller.seekTo(Duration.zero);
+                      _completionHandled = false;
                       await _saveProgress(sync: true);
                       if (mounted && _accessError == null) {
                         await controller.play();

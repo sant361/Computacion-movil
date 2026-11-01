@@ -27,6 +27,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   CatalogItem? _item;
   CatalogEpisode? _episode;
   late final String _playbackScope;
+  final _captions = ValueNotifier(const CaptionPreferences());
   late final PlaybackSleepTimer _sleepTimer;
   bool _autoplay = true;
   bool _ready = false;
@@ -35,13 +36,17 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _wasPlaying = false;
   bool _fullscreenOpen = false;
   bool _nextPending = false;
+  bool _loadingCaptions = false;
   int _lastSavedSecond = -1;
   int _generation = 0;
   String? _error;
+  String? _captionError;
   String? _accessError;
 
   String get _progressKey =>
       _episode?.progressKey(_item!.title) ?? _item!.title;
+  String get _subtitleSource =>
+      widget.trailer ? '' : (_episode?.subtitleUrl ?? _item?.subtitleUrl ?? '');
   bool get _canControl =>
       _ready && !_switching && _accessError == null && _error == null;
 
@@ -240,6 +245,8 @@ class _PlayerScreenState extends State<PlayerScreen>
       _wasPlaying = false;
       _lastSavedSecond = -1;
       _error = null;
+      _captionError = null;
+      _captions.value = const CaptionPreferences();
       _switching = false;
     });
     await _openVideo();
@@ -263,6 +270,35 @@ class _PlayerScreenState extends State<PlayerScreen>
     await _openVideo();
   }
 
+  Future<void> _toggleCaptions(bool enabled) async {
+    final controller = _controller;
+    if (controller == null || !_canControl) return;
+    if (!enabled) {
+      _captions.value = _captions.value.copyWith(enabled: false);
+      return;
+    }
+    setState(() {
+      _loadingCaptions = true;
+      _captionError = null;
+    });
+    final generation = _generation;
+    try {
+      final file = await loadCaptionFile(_subtitleSource);
+      if (!mounted || generation != _generation) return;
+      await controller.setClosedCaptionFile(Future.value(file));
+      _captions.value = _captions.value.copyWith(enabled: true);
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() => _captionError =
+            'No se pudieron cargar los subtítulos. Puedes volver a intentarlo.');
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loadingCaptions = false);
+      }
+    }
+  }
+
   Future<void> _fullscreen() async {
     final controller = _controller;
     if (!_canControl || controller == null) return;
@@ -270,7 +306,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     await Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (_) => FullscreenPlayerScreen(controller: controller),
+            builder: (_) => FullscreenPlayerScreen(
+                controller: controller, captions: _captions),
             fullscreenDialog: true));
     _fullscreenOpen = false;
     if (!mounted) return;
@@ -303,6 +340,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     unawaited(_saveProgress(sync: true));
     _generation++;
     _sleepTimer.dispose();
+    _captions.dispose();
     _controller?.removeListener(_onPlaybackChanged);
     _controller?.dispose();
     super.dispose();
@@ -338,6 +376,19 @@ class _PlayerScreenState extends State<PlayerScreen>
                             : controller.play(),
                         child: Stack(alignment: Alignment.center, children: [
                           VideoPlayer(controller),
+                          ValueListenableBuilder<CaptionPreferences>(
+                              valueListenable: _captions,
+                              builder: (_, settings, __) => Positioned(
+                                  bottom: 12,
+                                  left: 12,
+                                  right: 12,
+                                  child: settings.enabled
+                                      ? ClosedCaption(
+                                          text: controller.value.caption.text,
+                                          textStyle: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: settings.fontSize))
+                                      : const SizedBox.shrink())),
                           if (!controller.value.isPlaying)
                             const Icon(Icons.play_arrow,
                                 size: 56, color: Colors.white),
@@ -408,6 +459,36 @@ class _PlayerScreenState extends State<PlayerScreen>
                       }
                     }
                   : null),
+          if (_subtitleSource.isNotEmpty)
+            ValueListenableBuilder<CaptionPreferences>(
+                valueListenable: _captions,
+                builder: (_, settings, __) => Column(children: [
+                      SwitchListTile(
+                          title: const Text('Subtítulos'),
+                          subtitle: _loadingCaptions
+                              ? const Text('Cargando subtítulos')
+                              : null,
+                          value: settings.enabled,
+                          onChanged: ready && !_loadingCaptions
+                              ? _toggleCaptions
+                              : null),
+                      if (settings.enabled)
+                        Row(children: [
+                          const Text('Tamaño del texto'),
+                          Expanded(
+                              child: Slider(
+                                  min: 14,
+                                  max: 36,
+                                  divisions: 11,
+                                  value: settings.fontSize,
+                                  label: '${settings.fontSize.toInt()}',
+                                  onChanged: (value) => _captions.value =
+                                      settings.copyWith(fontSize: value)))
+                        ]),
+                    ])),
+          if (_captionError != null)
+            Text(_captionError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ValueListenableBuilder<Duration?>(
               valueListenable: _sleepTimer,
               builder: (_, duration, __) => DropdownButtonFormField<int>(

@@ -1,11 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '../playback/playback_support.dart';
 
 class FullscreenPlayerScreen extends StatefulWidget {
-  const FullscreenPlayerScreen({super.key, required this.controller});
+  const FullscreenPlayerScreen(
+      {super.key, required this.controller, this.captions});
   final VideoPlayerController controller;
+  final ValueListenable<CaptionPreferences>? captions;
   @override
   State<FullscreenPlayerScreen> createState() => _FullscreenPlayerScreenState();
 }
@@ -48,6 +51,19 @@ class _FullscreenPlayerScreenState extends State<FullscreenPlayerScreen> {
             child: AspectRatio(
                 aspectRatio: controller.value.aspectRatio,
                 child: VideoPlayer(controller))),
+        if (widget.captions != null)
+          Positioned(
+              bottom: 110,
+              left: 24,
+              right: 24,
+              child: ValueListenableBuilder<CaptionPreferences>(
+                  valueListenable: widget.captions!,
+                  builder: (_, settings, __) => settings.enabled
+                      ? ClosedCaption(
+                          text: controller.value.caption.text,
+                          textStyle: TextStyle(
+                              color: Colors.white, fontSize: settings.fontSize))
+                      : const SizedBox.shrink())),
         Positioned(
             top: 8,
             left: 8,

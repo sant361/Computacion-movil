@@ -16,13 +16,14 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
   int? _season;
   bool? _liked;
 
-  void _play(CatalogItem item, {CatalogEpisode? episode}) {
+  void _play(CatalogItem item,
+      {CatalogEpisode? episode, bool trailer = false}) {
     if (appState.catalogItem(item.title) == null) return;
     Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (_) =>
-                PlayerScreen(contentTitle: item.title, episode: episode)));
+            builder: (_) => PlayerScreen(
+                contentTitle: item.title, episode: episode, trailer: trailer)));
   }
 
   CatalogEpisode? _resumeEpisode(CatalogItem item) {
@@ -101,6 +102,11 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                     const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
                         child: Text('El video todavía no está disponible.')),
+                  if (isPlayableUrl(item.trailerUrl))
+                    OutlinedButton.icon(
+                        icon: const Icon(Icons.preview_outlined),
+                        label: const Text('Ver tráiler'),
+                        onPressed: () => _play(item, trailer: true)),
                   Row(children: [
                     Expanded(
                         child: OutlinedButton.icon(

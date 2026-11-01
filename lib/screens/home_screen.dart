@@ -50,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final catalog = appState.catalog;
     final featured = catalog.take(8).toList();
     final continueWatching = catalog
-        .where((item) => appState.watchProgress(item.title) != null)
+        .where((item) => appState.continueProgress(item) != null)
         .toList();
     final recommended = appState.recommendations;
     final featuredItems = catalog.take(5).toList();
@@ -184,7 +184,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 onItemTap: (item) => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => PlayerScreen(contentTitle: item.title),
+                      builder: (_) => PlayerScreen(
+                          contentTitle: item.title,
+                          episode: appState.mostRecentEpisode(item)),
                     )),
               ),
             const SizedBox(height: 12),
@@ -805,6 +807,17 @@ class _ContinueWatchingSection extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                              Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: IconButton(
+                                    tooltip:
+                                        'Quitar ${item.title} de Seguir viendo',
+                                    color: Colors.white,
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () => appState
+                                        .removeFromContinueWatching(item.title),
+                                  )),
                               const Center(
                                 child: Icon(
                                   Icons.play_circle_fill_rounded,
@@ -820,7 +833,7 @@ class _ContinueWatchingSection extends StatelessWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: appState.watchProgress(item.title)!.fraction,
+                          value: appState.continueProgress(item)!.fraction,
                           minHeight: 4,
                           backgroundColor: Colors.white12,
                           valueColor: const AlwaysStoppedAnimation(

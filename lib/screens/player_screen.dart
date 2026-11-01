@@ -10,8 +10,10 @@ class PlayerScreen extends StatefulWidget {
   const PlayerScreen(
       {super.key,
       this.contentTitle = 'Serie · Temporada 1',
+      this.episode,
       this.controllerFactory});
   final String contentTitle;
+  final CatalogEpisode? episode;
   final VideoPlayerController Function(Uri)? controllerFactory;
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -21,6 +23,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     with WidgetsBindingObserver {
   VideoPlayerController? _controller;
   CatalogItem? _item;
+  CatalogEpisode? _episode;
   late final String _playbackScope;
   bool _ready = false;
   bool? _liked;
@@ -32,7 +35,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   String? _error;
   String? _accessError;
 
-  String get _progressKey => _item!.title;
+  String get _progressKey =>
+      _episode?.progressKey(_item!.title) ?? _item!.title;
   bool get _canControl =>
       _ready && !_switching && _accessError == null && _error == null;
 
@@ -48,14 +52,48 @@ class _PlayerScreenState extends State<PlayerScreen>
       _accessError = 'Este contenido no está disponible para este perfil.';
       return;
     }
+    if (item.episodes.isNotEmpty) {
+      final requested = widget.episode;
+      final episodes = orderedEpisodes(item);
+      if (requested != null) {
+        _episode = episodes
+            .where((entry) =>
+                entry.progressKey(item.title) ==
+                requested.progressKey(item.title))
+            .firstOrNull;
+        if (_episode == null) {
+          _error = 'El episodio ya no está disponible.';
+          return;
+        }
+      } else {
+        final pending = episodes
+            .where((entry) =>
+                appState.watchProgress(entry.progressKey(item.title)) != null)
+            .toList()
+          ..sort((a, b) => appState
+              .watchProgress(b.progressKey(item.title))!
+              .updatedAt
+              .compareTo(appState
+                  .watchProgress(a.progressKey(item.title))!
+                  .updatedAt));
+        _episode = pending.isNotEmpty ? pending.first : episodes.first;
+      }
+    }
     unawaited(_openVideo());
   }
 
   void _onAppChanged() {
     if (!mounted) return;
     final current = appState.catalogItem(widget.contentTitle);
+    final episodeRemoved = _episode != null &&
+        current != null &&
+        !current.episodes.any((entry) =>
+            entry.progressKey(current.title) ==
+            _episode!.progressKey(_item!.title));
     if (_accessError == null &&
-        (_playbackScope != appState.playbackScope || current == null)) {
+        (_playbackScope != appState.playbackScope ||
+            current == null ||
+            episodeRemoved)) {
       _accessError = 'El perfil cambió o ya no tiene acceso a este contenido.';
       _controller?.pause();
       if (_fullscreenOpen) {
@@ -70,7 +108,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   Future<void> _openVideo() async {
     final item = _item;
     if (item == null) return;
-    final source = item.videoUrl;
+    final source = _episode?.videoUrl ?? item.videoUrl;
     if (!isPlayableUrl(source)) {
       if (mounted) {
         setState(
@@ -202,7 +240,7 @@ class _PlayerScreenState extends State<PlayerScreen>
     final ready = _canControl && controller != null;
     final error = _accessError ?? _error;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.contentTitle)),
+      appBar: AppBar(title: Text(_episode?.title ?? widget.contentTitle)),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         AspectRatio(
             aspectRatio: ready ? controller.value.aspectRatio : 16 / 9,

@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/catalog_item.dart';
 import '../services/progress_store.dart';
 import '../services/catalog_store.dart';
+import '../data/profile_details.dart';
+export '../data/profile_details.dart';
 
 /// Estado compartido simple de la app (sin paquetes externos de estado).
 ///
@@ -226,6 +228,9 @@ class AppState extends ChangeNotifier {
   Timer? _catalogTimer;
   final Map<String, Set<String>> _favoriteLists = {};
   final Map<String, Set<String>> _hiddenContinue = {};
+  final Map<String, Map<String, ProfileDetails>> _profileData = {};
+  final Set<String> _unlockedProfiles = {}, _pendingProfiles = {};
+  bool _selectionRequired = false, _leavingChild = false;
 
   String _parentTitle(String key) {
     for (final item in _catalog) {
@@ -287,6 +292,122 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     await _persistLibrary();
     unawaited(syncWatchProgress());
+  }
+
+  bool get profileLocked => false;
+
+  ProfileDetails profileDetails(String name) =>
+      _profileData[_profileUserId]?[name] ??
+      ProfileDetails(name: name, isChild: false, maxRating: '+18');
+
+  Future<void> _loadProfileDetails() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final uid = _profileUserId!;
+    _selectionRequired = prefs.getBool('profileSelection:$uid') ?? false;
+    _leavingChild = prefs.getBool('leavingChild:$uid') ?? false;
+    final result = <String, ProfileDetails>{};
+    try {
+      final raw =
+          jsonDecode(prefs.getString('profileDetails:$uid') ?? '{}') as Map;
+      for (final e in raw.entries) {
+        result[e.key as String] =
+            ProfileDetails.fromJson(Map<String, dynamic>.from(e.value as Map));
+      }
+    } catch (_) {
+      result.clear();
+    }
+    for (final name in _profiles) {
+      result.putIfAbsent(name,
+          () => ProfileDetails(name: name, isChild: false, maxRating: '+18'));
+    }
+    _profileData[uid] = result;
+  }
+
+  Future<void> _persistProfileDetails() async {
+    final uid = _profileUserId;
+    if (uid == null) return;
+    final data = jsonEncode(
+        (_profileData[uid] ?? {}).map((k, v) => MapEntry(k, v.toJson())));
+    final pending = _pendingProfiles.toList(), names = _profiles.toList();
+    final active = _activeProfile,
+        selection = _selectionRequired,
+        leaving = _leavingChild;
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setString('profileDetails:$uid', data);
+    await prefs.setStringList('pendingProfiles:$uid', pending);
+    await prefs.setStringList(_profilesKey(uid), names);
+    await prefs.setBool('profileSelection:$uid', selection);
+    await prefs.setBool('leavingChild:$uid', leaving);
+    if (active != null) await prefs.setString(_activeProfileKey(uid), active);
+  }
+
+  Future<void> _saveProfile(ProfileDetails profile) async {
+    final uid = _profileUserId;
+    if (uid == null) throw StateError('Selecciona una cuenta.');
+    _profileData.putIfAbsent(uid, () => {})[profile.name] = profile;
+    _pendingProfiles.add(profile.name);
+    await _persistProfileDetails();
+  }
+
+  Future<void> configureProfile(String name,
+      {String? avatar, bool? isChild, String? maxRating, String? pin}) async {
+    if (profileDetails(_activeProfile ?? '').isChild || profileLocked) {
+      throw StateError('Usa un perfil adulto para gestionar perfiles.');
+    }
+    final old = profileDetails(name);
+    if (old.hasPin && !_unlockedProfiles.contains(name)) {
+      throw StateError('Introduce el PIN del perfil.');
+    }
+    if (!_profiles.contains(name)) throw StateError('El perfil no existe.');
+    if (maxRating != null && !parentalRatings.contains(maxRating)) {
+      throw ArgumentError('Clasificación no válida.');
+    }
+    if (pin != null && pin.isNotEmpty && !RegExp(r'^\d{4,6}$').hasMatch(pin)) {
+      throw ArgumentError('El PIN debe tener de 4 a 6 dígitos.');
+    }
+    final willBeChild = isChild ?? old.isChild;
+    if (willBeChild &&
+        !_profiles
+            .any((other) => other != name && !profileDetails(other).isChild)) {
+      throw StateError('Conserva un perfil adulto para gestionar la cuenta.');
+    }
+    var hash = old.pinHash, salt = old.pinSalt;
+    if (pin != null) {
+      if (pin.isEmpty) {
+        hash = '';
+        salt = '';
+      } else {
+        final encoded = await ProfileDetails.encodePin(pin);
+        hash = encoded[0];
+        salt = encoded[1];
+      }
+    }
+    await _saveProfile(ProfileDetails(
+        name: name,
+        avatar: avatar ?? old.avatar,
+        isChild: isChild ?? old.isChild,
+        maxRating: maxRating ?? (isChild == true ? 'TP' : old.maxRating),
+        pinHash: hash,
+        pinSalt: salt,
+        updatedAt: DateTime.now().microsecondsSinceEpoch));
+    notifyListeners();
+  }
+
+  Future<bool> verifyProfilePin(String name, String pin) async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final key = 'pinAttempts:${_profileUserId ?? "local"}:$name';
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if ((prefs.getInt('$key:lockedUntil') ?? 0) > now) return false;
+    final valid = await profileDetails(name).verifyPin(pin);
+    if (valid) {
+      _unlockedProfiles.add(name);
+      await prefs.remove(key);
+      return true;
+    }
+    final attempts = (prefs.getInt(key) ?? 0) + 1;
+    await prefs.setInt(key, attempts % 5);
+    if (attempts >= 5) await prefs.setInt('$key:lockedUntil', now + 30000);
+    return false;
   }
 
   Future<void> _persistLibrary() async {
@@ -584,6 +705,9 @@ class AppState extends ChangeNotifier {
   Future<void> logout() async {
     _stopProgressSync();
     _catalogTimer?.cancel();
+    _unlockedProfiles.clear();
+    _selectionRequired = false;
+    _leavingChild = false;
     _isLoggedIn = false;
     _paymentUserId = null;
     _paymentMethods = [];
@@ -801,6 +925,8 @@ class AppState extends ChangeNotifier {
   /// para que la pantalla no empiece vacía.
   Future<void> loadProfiles(String userId) async {
     _stopProgressSync();
+    final changingUser = _profileUserId != userId;
+    if (changingUser) _unlockedProfiles.clear();
     _profileUserId = userId;
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     _loadWatchHistory(prefs);
@@ -809,6 +935,7 @@ class AppState extends ChangeNotifier {
     _activeProfile = prefs.getString(_activeProfileKey(userId)) ??
         (_profiles.isNotEmpty ? _profiles.first : null);
     await _loadLibrary();
+    await _loadProfileDetails();
     notifyListeners();
     await _persistProfiles();
     _startProgressSync();
@@ -892,14 +1019,16 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _persistProfiles() async {
-    final userId = _profileUserId;
-    if (userId == null) return;
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
-    await prefs.setStringList(_profilesKey(userId), _profiles);
+    final uid = _profileUserId;
+    if (uid == null) return;
+    final names = _profiles.toList();
     final active = _activeProfile;
-    if (active != null) {
-      await prefs.setString(_activeProfileKey(userId), active);
-    }
+    final selection = _selectionRequired, leaving = _leavingChild;
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setStringList(_profilesKey(uid), names);
+    await prefs.setBool('profileSelection:$uid', selection);
+    await prefs.setBool('leavingChild:$uid', leaving);
+    if (active != null) await prefs.setString(_activeProfileKey(uid), active);
   }
 
   /// Marca [name] como el perfil que se está usando ahora mismo.
@@ -919,7 +1048,12 @@ class AppState extends ChangeNotifier {
       await _persistProfiles();
       return;
     }
+    if (profileLocked || profileDetails(_activeProfile ?? '').isChild) {
+      throw StateError('Usa un perfil adulto para crear perfiles.');
+    }
     _profiles.add(trimmed);
+    await _saveProfile(ProfileDetails(
+        name: trimmed, updatedAt: DateTime.now().microsecondsSinceEpoch));
     notifyListeners();
     await _persistProfiles();
   }
@@ -927,6 +1061,34 @@ class AppState extends ChangeNotifier {
   /// Elimina el perfil [name]. Si era el activo, el primero que quede
   /// pasa a ser el nuevo activo.
   Future<void> removeProfile(String name) async {
+    if (profileLocked || profileDetails(_activeProfile ?? '').isChild) {
+      throw StateError('Usa un perfil adulto para eliminar perfiles.');
+    }
+    if (profileDetails(name).hasPin && !_unlockedProfiles.contains(name)) {
+      throw StateError('Introduce el PIN del perfil.');
+    }
+    final oldProfile = profileDetails(name);
+    if (!oldProfile.isChild &&
+        !_profiles.any((n) => n != name && !profileDetails(n).isChild)) {
+      throw StateError(
+          'Debe quedar al menos un perfil adulto para gestionar la cuenta.');
+    }
+    if (oldProfile.hasPin &&
+        !oldProfile.isChild &&
+        !_profiles.any((n) =>
+            n != name &&
+            !profileDetails(n).isChild &&
+            profileDetails(n).hasPin)) {
+      throw StateError(
+          'Conserva otro perfil adulto con PIN antes de eliminar este perfil.');
+    }
+    await _saveProfile(ProfileDetails(
+        name: name,
+        avatar: oldProfile.avatar,
+        isChild: oldProfile.isChild,
+        maxRating: oldProfile.maxRating,
+        deleted: true,
+        updatedAt: DateTime.now().microsecondsSinceEpoch));
     final scope = jsonEncode([_profileUserId, name]);
     final entries = Map<String, WatchProgress>.from(_watchHistory[scope] ?? {});
     for (final entry in entries.entries) {
@@ -935,6 +1097,8 @@ class AppState extends ChangeNotifier {
           scope: scope);
     }
     _viewedTitles.remove(scope);
+    _favoriteLists.remove(scope);
+    await _persistLibrary();
     await _persistWatchHistory();
     unawaited(syncWatchProgress());
     _profiles.remove(name);

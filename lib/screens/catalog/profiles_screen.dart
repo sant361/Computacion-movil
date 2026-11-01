@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
@@ -30,7 +31,9 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       _error = null;
     });
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid ?? 'local';
+      final uid = Firebase.apps.isEmpty
+          ? 'local'
+          : FirebaseAuth.instance.currentUser?.uid ?? 'local';
       await appState.loadProfiles(uid);
     } catch (_) {
       if (mounted) {
@@ -68,6 +71,78 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       await appState.setActiveProfile(name);
       if (mounted) Navigator.pop(context, name);
     });
+  }
+
+  Future<void> _editProfile(String name) async {
+    final details = appState.profileDetails(name);
+    var avatar =
+        _avatarIcons.containsKey(details.avatar) ? details.avatar : 'person';
+    final avatarUrl = TextEditingController(
+        text: details.avatar.startsWith('https://') ? details.avatar : '');
+    final form = GlobalKey<FormState>();
+    final accepted = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+              builder: (context, update) => AlertDialog(
+                title: Text('Editar $name'),
+                content: SingleChildScrollView(
+                    child: Form(
+                        key: form,
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                          const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('Avatar')),
+                          Wrap(
+                              spacing: 8,
+                              children: _avatarIcons.entries
+                                  .map((entry) => ChoiceChip(
+                                        label: Icon(entry.value),
+                                        selected: avatar == entry.key,
+                                        tooltip: _avatarNames[entry.key],
+                                        onSelected: (_) => update(() {
+                                          avatar = entry.key;
+                                          avatarUrl.clear();
+                                        }),
+                                      ))
+                                  .toList()),
+                          TextFormField(
+                              controller: avatarUrl,
+                              keyboardType: TextInputType.url,
+                              decoration: const InputDecoration(
+                                  labelText:
+                                      'URL de imagen del avatar (opcional)'),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return null;
+                                }
+                                final uri = Uri.tryParse(value.trim());
+                                return uri != null &&
+                                        uri.scheme == 'https' &&
+                                        uri.host.isNotEmpty
+                                    ? null
+                                    : 'Usa una dirección HTTPS válida.';
+                              }),
+                        ]))),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Cancelar')),
+                  TextButton(
+                      onPressed: () {
+                        if (form.currentState!.validate()) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      },
+                      child: const Text('Guardar')),
+                ],
+              ),
+            ));
+    final selectedAvatar =
+        avatarUrl.text.trim().isEmpty ? avatar : avatarUrl.text.trim();
+    avatarUrl.dispose();
+    if (accepted != true || !mounted) return;
+    await _save(() => appState.configureProfile(name, avatar: selectedAvatar));
   }
 
   Future<void> _addProfile() async {
@@ -118,6 +193,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   }
 
   Future<void> _removeProfile(String name) async {
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -197,35 +273,36 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate:
                           const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 220,
-                            mainAxisExtent: 210,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
+                        maxCrossAxisExtent: 220,
+                        mainAxisExtent: 210,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                      ),
                       children: [
                         ...profiles.map(
                           (name) => _ProfileAvatar(
                             name: name,
+                            avatar: appState.profileDetails(name).avatar,
                             selected: active == name,
                             showDelete: _editMode,
-                            onTap: _saving || _error != null || _editMode
+                            onEdit: _saving ? null : () => _editProfile(name),
+                            onTap: _saving || _editMode
                                 ? null
                                 : () => _selectProfile(name),
-                            onDelete: _saving || _error != null
-                                ? null
-                                : () => _removeProfile(name),
+                            onDelete:
+                                _saving ? null : () => _removeProfile(name),
                           ),
                         ),
                         _ProfileAvatar(
                           name: 'Agregar',
                           isAdd: true,
-                          onTap: _saving || _error != null ? null : _addProfile,
+                          onTap: _saving ? null : _addProfile,
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
                     OutlinedButton(
-                      onPressed: _saving || _error != null
+                      onPressed: _saving
                           ? null
                           : () => setState(() => _editMode = !_editMode),
                       child: Text(_editMode ? 'Listo' : 'Gestionar perfiles'),
@@ -251,6 +328,8 @@ class _ProfileAvatar extends StatelessWidget {
   final bool selected;
   final bool isAdd;
   final bool showDelete;
+  final String avatar;
+  final VoidCallback? onEdit;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
 
@@ -261,6 +340,8 @@ class _ProfileAvatar extends StatelessWidget {
     this.selected = false,
     this.isAdd = false,
     this.showDelete = false,
+    this.avatar = 'initials',
+    this.onEdit,
   });
 
   @override
@@ -275,11 +356,8 @@ class _ProfileAvatar extends StatelessWidget {
     for (final rune in name.trim().toLowerCase().runes) {
       hash = (hash * 31 + rune) % 1000000007;
     }
-    final words = name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
+    final words =
+        name.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
     final initials = words.isEmpty
         ? '?'
         : [
@@ -321,13 +399,29 @@ class _ProfileAvatar extends StatelessWidget {
                                     size: 32,
                                     color: Colors.white,
                                   )
-                                : Text(
-                                    initials,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                    ),
-                                  ),
+                                : avatar.startsWith('https://')
+                                    ? ClipOval(
+                                        child: Image.network(avatar,
+                                            width: 64,
+                                            height: 64,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(Icons.person,
+                                                    color: Colors.white,
+                                                    size: 32)))
+                                    : avatar != 'initials'
+                                        ? Icon(
+                                            _avatarIcons[avatar] ??
+                                                Icons.person,
+                                            color: Colors.white,
+                                            size: 32)
+                                        : Text(
+                                            initials,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 24,
+                                            ),
+                                          ),
                           ),
                           if (selected && !isAdd)
                             const Positioned(
@@ -352,9 +446,8 @@ class _ProfileAvatar extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontWeight: selected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                          fontWeight:
+                              selected ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
                       if (selected && !isAdd)
@@ -370,13 +463,32 @@ class _ProfileAvatar extends StatelessWidget {
           ),
         ),
         if (showDelete && !isAdd)
-          TextButton.icon(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Eliminar'),
-            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
-          ),
+          Wrap(alignment: WrapAlignment.center, children: [
+            TextButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Editar')),
+            TextButton.icon(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Eliminar'),
+              style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            ),
+          ]),
       ],
     );
   }
 }
+
+const _avatarIcons = <String, IconData>{
+  'person': Icons.person,
+  'movie': Icons.movie,
+  'pets': Icons.pets,
+  'star': Icons.star,
+};
+const _avatarNames = <String, String>{
+  'person': 'Persona',
+  'movie': 'Cine',
+  'pets': 'Mascota',
+  'star': 'Estrella',
+};

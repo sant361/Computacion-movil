@@ -78,6 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         await appState.login();
+        await appState.loadProfiles('local');
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
@@ -92,9 +93,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       await appState.login();
       await appState.loadCatalogFromFirestore();
-      await appState.loadProfiles(FirebaseAuth.instance.currentUser?.uid ?? 'local');
-      await appState.loadParentalSettings(FirebaseAuth.instance.currentUser?.uid ?? 'local');
-      await appState.loadAdminStatus(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      await appState
+          .loadProfiles(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      await appState.loadParentalSettings(
+          FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      await appState
+          .loadAdminStatus(FirebaseAuth.instance.currentUser?.uid ?? 'local');
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -119,7 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 24),
-                const Text('Login', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const Text('Login',
+                    style:
+                        TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 24),
                 TextFormField(
                   controller: _emailController,
@@ -129,7 +135,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelText: 'Correo electrónico',
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Ingresa tu correo';
+                    }
                     if (!v.contains('@')) return 'Ingresa un correo válido';
                     return null;
                   },
@@ -142,8 +150,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     prefixIcon: const Icon(Icons.lock_outline),
                     labelText: 'Password',
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   validator: (v) {
@@ -154,14 +165,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 8),
-                  Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  Text(_errorMessage!,
+                      style: const TextStyle(color: Colors.red, fontSize: 13)),
                 ],
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const ForgotPasswordScreen()),
                     ),
                     child: const Text('¿Olvidaste tu contraseña?'),
                   ),
@@ -179,7 +192,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     : PrimaryButton(label: 'LOGIN', onPressed: _submit),
                 const SizedBox(height: 16),
                 OutlinedButton(
-                  onPressed: _autofill, // req. 2 — autocompletar datos de prueba.
+                  onPressed:
+                      _autofill, // req. 2 — autocompletar datos de prueba.
                   child: const Text('Autocompletar datos'),
                 ),
                 const SizedBox(height: 24),

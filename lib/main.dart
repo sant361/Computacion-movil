@@ -45,9 +45,15 @@ class _AppStartup extends StatelessWidget {
     await appState.load();
     if (appState.isLoggedIn) {
       await appState.loadCatalogFromFirestore();
-      await appState.loadProfiles(FirebaseAuth.instance.currentUser?.uid ?? 'local');
-      await appState.loadParentalSettings(FirebaseAuth.instance.currentUser?.uid ?? 'local');
-      await appState.loadAdminStatus(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      await appState.loadProfiles(Firebase.apps.isEmpty
+          ? 'local'
+          : FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      await appState.loadParentalSettings(Firebase.apps.isEmpty
+          ? 'local'
+          : FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      await appState.loadAdminStatus(Firebase.apps.isEmpty
+          ? 'local'
+          : FirebaseAuth.instance.currentUser?.uid ?? 'local');
     }
   }
 
@@ -57,7 +63,8 @@ class _AppStartup extends StatelessWidget {
       future: _startup(),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
         return appState.isLoggedIn ? const HomeScreen() : const LoginScreen();
       },

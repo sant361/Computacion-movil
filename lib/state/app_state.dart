@@ -877,7 +877,8 @@ class AppState extends ChangeNotifier {
   /// mostrando el catálogo de muestra local en vez de dejar la app vacía.
   /// Agrega un contenido nuevo al catálogo (Firestore) y lo muestra de
   /// inmediato en Inicio y Búsqueda. Lanza un error si no se pudo guardar.
-
+  List<CatalogItem> get adminCatalog =>
+      isAdmin ? List.unmodifiable(_catalog) : const [];
   CatalogItem? catalogItem(String key) {
     for (final item in catalog) {
       if (item.title == key ||
@@ -895,6 +896,19 @@ class AppState extends ChangeNotifier {
     }
     final saved = await _catalogStore.add(item);
     _catalog = [..._catalog, saved];
+    await _cacheCatalog();
+    notifyListeners();
+  }
+
+  Future<void> updateCatalogItem(CatalogItem item) async {
+    if (!isAdmin) {
+      throw StateError('Solo un administrador puede editar contenido.');
+    }
+    if (item.id.isEmpty) {
+      throw StateError('Actualiza el catálogo antes de editar este título.');
+    }
+    await _catalogStore.update(item);
+    _catalog = _catalog.map((old) => old.id == item.id ? item : old).toList();
     await _cacheCatalog();
     notifyListeners();
   }

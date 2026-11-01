@@ -231,6 +231,7 @@ class AppState extends ChangeNotifier {
   final Map<String, Map<String, ProfileDetails>> _profileData = {};
   final Set<String> _unlockedProfiles = {}, _pendingProfiles = {};
   bool _selectionRequired = false, _leavingChild = false;
+  final Map<String, Set<String>> _hiddenHistory = {}, _completed = {};
 
   String _parentTitle(String key) {
     for (final item in _catalog) {
@@ -426,11 +427,52 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
+  List<HistoryEntry> get viewingHistory {
+    final entries = <HistoryEntry>[];
+    for (final entry
+        in (_watchHistory[playbackScope] ?? <String, WatchProgress>{})
+            .entries) {
+      if (catalogItem(entry.key) == null ||
+          (_hiddenHistory[playbackScope] ?? {}).contains(entry.key)) {
+        continue;
+      }
+      final p = entry.value;
+      if (p.positionMs == 0 &&
+          !(_viewedTitles[playbackScope] ?? {})
+              .contains(_parentTitle(entry.key))) {
+        continue;
+      }
+      entries.add(HistoryEntry(entry.key, p.positionMs, p.durationMs,
+          p.updatedAt, (_completed[playbackScope] ?? {}).contains(entry.key)));
+    }
+    entries.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return List.unmodifiable(entries);
+  }
+
+  Future<void> clearViewingHistory() async {
+    final keys = (_watchHistory[playbackScope] ?? {}).keys.toList();
+    for (final key in keys) {
+      final p = _watchHistory[playbackScope]![key]!;
+      await saveWatchProgress(
+          key, Duration.zero, Duration(milliseconds: p.durationMs),
+          scope: playbackScope);
+    }
+    _viewedTitles.remove(playbackScope);
+    _hiddenHistory.putIfAbsent(playbackScope, () => {}).addAll(keys);
+    _completed.remove(playbackScope);
+    notifyListeners();
+    await _persistWatchHistory();
+    await _persistLibrary();
+    unawaited(syncWatchProgress());
+  }
+
   Future<void> _persistLibrary() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     for (final pair in {
       'favoriteLists': _favoriteLists,
-      'hiddenContinue': _hiddenContinue
+      'hiddenContinue': _hiddenContinue,
+      'hiddenHistory': _hiddenHistory,
+      'completedPlayback': _completed
     }.entries) {
       await prefs.setString(pair.key,
           jsonEncode(pair.value.map((k, v) => MapEntry(k, v.toList()))));
@@ -441,7 +483,9 @@ class AppState extends ChangeNotifier {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     for (final pair in {
       'favoriteLists': _favoriteLists,
-      'hiddenContinue': _hiddenContinue
+      'hiddenContinue': _hiddenContinue,
+      'hiddenHistory': _hiddenHistory,
+      'completedPlayback': _completed
     }.entries) {
       pair.value.clear();
       try {
@@ -523,7 +567,13 @@ class AppState extends ChangeNotifier {
     final milliseconds =
         position.inMilliseconds.clamp(0, duration.inMilliseconds);
     _rememberViewed(scope, _parentTitle(title), milliseconds);
+    if (milliseconds >= duration.inMilliseconds - 250) {
+      _completed.putIfAbsent(scope, () => {}).add(title);
+    } else if (milliseconds == 0) {
+      _completed[scope]?.remove(title);
+    }
     _hiddenContinue[scope]?.remove(title);
+    _hiddenHistory[scope]?.remove(title);
     final previous = history[title]?.updatedAt ?? 0;
     final now = DateTime.now().microsecondsSinceEpoch;
     final updated = now > previous ? now : previous + 1;
@@ -1190,3 +1240,11 @@ class WatchProgress {
 
 /// Instancia única compartida por toda la app.
 final AppState appState = AppState();
+
+class HistoryEntry {
+  const HistoryEntry(this.title, this.positionMs, this.durationMs,
+      this.updatedAt, this.completed);
+  final String title;
+  final int positionMs, durationMs, updatedAt;
+  final bool completed;
+}

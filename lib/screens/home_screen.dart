@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import '../widgets/catalog_artwork.dart';
 import 'catalog/my_list_screen.dart';
 import 'catalog/profiles_screen.dart';
+import 'catalog/viewing_history_screen.dart';
 import 'catalog/downloads_screen.dart';
 import 'catalog/notifications_screen.dart';
 import 'content_detail_screen.dart';
@@ -136,6 +137,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   screen = const NotificationsScreen();
                 case 'mylist':
                   screen = const MyListScreen();
+                case 'history':
+                  screen = const ViewingHistoryScreen();
                 case 'tokens':
                   screen = const TokensScreen();
                 default:
@@ -153,6 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Text('Notificaciones'),
               ),
               PopupMenuItem(value: 'mylist', child: Text('Mi lista')),
+              PopupMenuItem(value: 'history', child: Text('Historial')),
               PopupMenuItem(value: 'tokens', child: Text('Mis tokens')),
               PopupMenuItem(
                 value: 'subscription',

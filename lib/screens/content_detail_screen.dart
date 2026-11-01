@@ -1,128 +1,141 @@
 import 'package:flutter/material.dart';
-import 'player_screen.dart';
-import 'tokens/access_options_screen.dart';
+import 'package:flutter/services.dart';
+import '../data/catalog_item.dart';
+import '../playback/playback_support.dart';
 import '../state/app_state.dart';
+import 'player_screen.dart';
 
-/// Req. 19: ficha de un contenido (serie/película) antes de reproducir.
-class ContentDetailScreen extends StatelessWidget {
-  final String title;
+class ContentDetailScreen extends StatefulWidget {
   const ContentDetailScreen({super.key, this.title = 'Título de la serie'});
+  final String title;
+  @override
+  State<ContentDetailScreen> createState() => _ContentDetailScreenState();
+}
+
+class _ContentDetailScreenState extends State<ContentDetailScreen> {
+  bool? _liked;
+
+  void _play(CatalogItem item) {
+    if (appState.catalogItem(item.title) == null) return;
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => PlayerScreen(contentTitle: item.title)));
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 220,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                color: const Color(0xFFEEF0F4),
-                child: const Center(child: Icon(Icons.play_circle_outline, size: 56)),
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text('2026 · 3 temporadas · +14', style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 8),
-                const Wrap(
-                  spacing: 8,
-                  children: [
-                    Chip(label: Text('Drama')),
-                    Chip(label: Text('Suspenso')),
-                    Chip(label: Text('Acción')),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Sinopsis: descripción del contenido, lista para reemplazar con los datos reales '
-                  'del catálogo (reparto, director, temporadas, episodios).',
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.play_arrow),
-                    label: ListenableBuilder(
-                      listenable: appState,
-                      builder: (_, __) => Text(appState.watchProgress(title) == null
-                          ? 'REPRODUCIR' : 'CONTINUAR VIENDO'),
-                    ),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => PlayerScreen(contentTitle: title)),
-                    ),
+    return ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) {
+          final item = appState.catalogItem(widget.title);
+          if (item == null) {
+            return Scaffold(
+                appBar: AppBar(title: const Text('Contenido no disponible')),
+                body: const Center(
+                    child: Text(
+                        'Este contenido no está disponible para este perfil.')));
+          }
+          final progress = appState.watchProgress(item.title);
+          final playable = isPlayableUrl(item.videoUrl);
+          final liked = _liked;
+          return Scaffold(
+              body: CustomScrollView(slivers: [
+            const SliverAppBar(
+                expandedHeight: 240,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                    background: ColoredBox(
+                        color: Color(0xFF132237),
+                        child: Center(
+                            child: Icon(Icons.movie_outlined,
+                                size: 64, color: Colors.white70))))),
+            SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                  Text(item.title,
+                      style: const TextStyle(
+                          fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(
+                      '${item.year} · ${item.genre} · ${item.language} · ${item.rating}',
+                      style: const TextStyle(color: Colors.grey)),
+                  Text('${item.durationMinutes} minutos'),
+                  const SizedBox(height: 16),
+                  Text(item.description.isEmpty
+                      ? 'La sinopsis todavía no está disponible.'
+                      : item.description),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                      icon: const Icon(Icons.play_arrow),
+                      label: Text(
+                          progress == null ? 'REPRODUCIR' : 'CONTINUAR VIENDO'),
+                      onPressed: playable ? () => _play(item) : null),
+                  if (!playable)
+                    const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text('El video todavía no está disponible.')),
+                  Row(children: [
+                    Expanded(
+                        child: OutlinedButton.icon(
+                            icon: Icon(appState.isInMyList(item.title)
+                                ? Icons.favorite
+                                : Icons.favorite_border),
+                            label: Text(appState.isInMyList(item.title)
+                                ? 'En mi lista'
+                                : 'Mi lista'),
+                            onPressed: () =>
+                                appState.toggleMyList(item.title))),
+                    IconButton(
+                        tooltip: 'Me gusta',
+                        icon: Icon(liked == true
+                            ? Icons.thumb_up
+                            : Icons.thumb_up_outlined),
+                        onPressed: () => setState(
+                            () => _liked = liked == true ? null : true)),
+                    IconButton(
+                        tooltip: 'No me gusta',
+                        icon: Icon(liked == false
+                            ? Icons.thumb_down
+                            : Icons.thumb_down_outlined),
+                        onPressed: () => setState(
+                            () => _liked = liked == false ? null : false)),
+                  ]),
+                  Row(children: [
+                    Expanded(
+                        child: OutlinedButton.icon(
+                            icon: const Icon(Icons.share),
+                            label: const Text('Copiar título'),
+                            onPressed: () async {
+                              await Clipboard.setData(ClipboardData(
+                                  text: '${item.title} — +Wnovelas'));
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Título copiado para compartir.')));
+                              }
+                            })),
+                  ]),
+                  OutlinedButton.icon(
+                    icon: Icon(appState.isDownloaded(item.title)
+                        ? Icons.check_circle
+                        : Icons.download_outlined),
+                    label: Text(appState.isDownloaded(item.title)
+                        ? 'En descargas'
+                        : 'Guardar en descargas'),
+                    onPressed: appState.isDownloaded(item.title)
+                        ? null
+                        : () {
+                            appState.downloadContent(item.title);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Agregado a Descargas.')));
+                          },
                   ),
-                ),
-                const SizedBox(height: 12),
-                ListenableBuilder(
-                  listenable: appState,
-                  builder: (context, _) {
-                    final inMyList = appState.isInMyList(title);
-                    final downloaded = appState.isDownloaded(title);
-                    return Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                icon: Icon(inMyList ? Icons.favorite : Icons.favorite_border),
-                                label: Text(inMyList ? 'En mi lista' : '+ Mi lista'),
-                                onPressed: () => appState.toggleMyList(title),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                icon: const Icon(Icons.share),
-                                label: const Text('Compartir'),
-                                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Enlace copiado para compartir')),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            icon: Icon(downloaded ? Icons.check_circle : Icons.download_outlined),
-                            label: Text(downloaded ? 'Descargado' : 'Descargar'),
-                            onPressed: downloaded
-                                ? null
-                                : () {
-                                    appState.downloadContent(title);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Descarga completa')),
-                                    );
-                                  },
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextButton.icon(
-                  icon: const Icon(Icons.lock_outline, size: 18),
-                  label: const Text('Este episodio está restringido'),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AccessOptionsScreen()),
-                  ),
-                ),
-              ]),
-            ),
-          ),
-        ],
-      ),
-    );
+                ]))),
+          ]));
+        });
   }
 }

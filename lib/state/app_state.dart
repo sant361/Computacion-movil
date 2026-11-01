@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/catalog_item.dart';
 import '../services/progress_store.dart';
+import '../services/catalog_store.dart';
 
 /// Estado compartido simple de la app (sin paquetes externos de estado).
 ///
@@ -20,8 +21,13 @@ import '../services/progress_store.dart';
 /// para mantener esto simple; guardarlo sería el siguiente paso natural.
 class AppState extends ChangeNotifier {
   AppState(
-      {ProgressStore? progressStore, String? Function()? authenticatedUserId})
-      : _progressStore = progressStore ?? FirestoreProgressStore(),
+      {ProgressStore? progressStore,
+      CatalogStore? catalogStore,
+      Future<bool> Function(String)? adminStatus,
+      String? Function()? authenticatedUserId})
+      : _catalogStore = catalogStore ?? FirestoreCatalogStore(),
+        _adminStatus = adminStatus,
+        _progressStore = progressStore ?? FirestoreProgressStore(),
         _authenticatedUserId = authenticatedUserId ?? _firebaseUserId;
 
   static String? _firebaseUserId() =>
@@ -207,8 +213,13 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _stopProgressSync();
+    _catalogTimer?.cancel();
     super.dispose();
   }
+
+  final CatalogStore _catalogStore;
+  final Future<bool> Function(String)? _adminStatus;
+  Timer? _catalogTimer;
 
   static const _tokenBalanceKey = 'tokenBalance';
   static const _myListKey = 'myList';
@@ -351,6 +362,11 @@ class AppState extends ChangeNotifier {
   /// permisos), se asume que NO lo es.
   Future<void> loadAdminStatus(String userId) async {
     try {
+      if (_adminStatus != null) {
+        _isAdmin = await _adminStatus!(userId);
+        notifyListeners();
+        return;
+      }
       final doc = await FirebaseFirestore.instance
           .collection('admins')
           .doc(userId)
@@ -406,6 +422,7 @@ class AppState extends ChangeNotifier {
   /// antes de runApp(), para que la app abra ya con los datos reales.
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
+    _restoreCatalogCache(_prefs!);
     _loadWatchHistory(_prefs!);
     _tokenBalance = _prefs!.getInt(_tokenBalanceKey) ?? _tokenBalance;
     _isLoggedIn = _prefs!.getBool(_isLoggedInKey) ?? false;
@@ -456,6 +473,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> logout() async {
     _stopProgressSync();
+    _catalogTimer?.cancel();
     _isLoggedIn = false;
     _paymentUserId = null;
     _paymentMethods = [];
@@ -599,89 +617,69 @@ class AppState extends ChangeNotifier {
   /// mostrando el catálogo de muestra local en vez de dejar la app vacía.
   /// Agrega un contenido nuevo al catálogo (Firestore) y lo muestra de
   /// inmediato en Inicio y Búsqueda. Lanza un error si no se pudo guardar.
+
+  CatalogItem? catalogItem(String key) {
+    for (final item in catalog) {
+      if (item.title == key ||
+          (item.id.isNotEmpty && item.id == key) ||
+          item.episodes.any((e) => e.progressKey(item.title) == key)) {
+        return item;
+      }
+    }
+    return null;
+  }
+
   Future<void> addCatalogItem(CatalogItem item) async {
-    await FirebaseFirestore.instance.collection('catalog').add({
-      'title': item.title,
-      'genre': item.genre,
-      'year': item.year,
-      'language': item.language,
-      'durationMinutes': item.durationMinutes,
-    }).timeout(const Duration(seconds: 10));
-    _catalog = [..._catalog, item];
+    if (!isAdmin) {
+      throw StateError('Solo un administrador puede guardar contenido.');
+    }
+    final saved = await _catalogStore.add(item);
+    _catalog = [..._catalog, saved];
+    await _cacheCatalog();
+    notifyListeners();
+  }
+
+  String? catalogError;
+  void _restoreCatalogCache(SharedPreferences prefs) {
+    try {
+      final raw = prefs.getString('catalogCache');
+      if (raw == null) return;
+      _catalog = (jsonDecode(raw) as List).map((e) {
+        final data = Map<String, dynamic>.from(e as Map);
+        return CatalogItem.fromJson(data, id: data['id'] as String? ?? '');
+      }).toList();
+    } catch (_) {}
+  }
+
+  Future<void> _cacheCatalog() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setString(
+        'catalogCache',
+        jsonEncode(_catalog
+            .map((item) => {...item.toJson(), 'id': item.id})
+            .toList()));
+  }
+
+  Future<void> refreshCatalog() async {
+    try {
+      final incoming = await _catalogStore.load();
+      _catalog = incoming;
+      await _cacheCatalog();
+      catalogError = null;
+    } catch (_) {
+      catalogError =
+          'No se pudo actualizar el catálogo. Se conserva la última copia.';
+    }
     notifyListeners();
   }
 
   Future<void> loadCatalogFromFirestore() async {
-    try {
-      final collection = FirebaseFirestore.instance.collection('catalog');
-      final snapshot = await collection.get();
-      if (snapshot.docs.isEmpty) {
-        final batch = FirebaseFirestore.instance.batch();
-        for (final item in sampleCatalog) {
-          batch.set(collection.doc(), {
-            'title': item.title,
-            'genre': item.genre,
-            'year': item.year,
-            'language': item.language,
-            'durationMinutes': item.durationMinutes,
-          });
-        }
-        await batch.commit();
-        _catalog = sampleCatalog;
-      } else {
-        // Si el catálogo se sembró antes de agregar idioma/duración,
-        // a los documentos viejos les completamos esos campos aquí
-        // mismo (una sola vez) para que el filtro funcione con todo.
-        final backfill = FirebaseFirestore.instance.batch();
-        var needsBackfill = false;
-        _catalog = snapshot.docs.asMap().entries.map((entry) {
-          final index = entry.key;
-          final doc = entry.value;
-          final data = doc.data();
-          final genre = data['genre'] as String? ?? '';
-          var language = data['language'] as String?;
-          var duration = (data['durationMinutes'] as num?)?.toInt();
-          if (language == null || duration == null) {
-            language ??= _defaultLanguageFor(index);
-            duration ??= _defaultDurationFor(genre, index);
-            backfill.update(doc.reference,
-                {'language': language, 'durationMinutes': duration});
-            needsBackfill = true;
-          }
-          return CatalogItem(
-            title: data['title'] as String? ?? '',
-            genre: genre,
-            year: (data['year'] as num?)?.toInt() ?? 0,
-            language: language,
-            durationMinutes: duration,
-          );
-        }).toList();
-        if (needsBackfill) {
-          await backfill.commit();
-        }
-      }
-      notifyListeners();
-    } catch (_) {
-      // Sin conexión o sin permisos: se mantiene el catálogo de muestra
-      // local que ya estaba mostrando la app.
+    await refreshCatalog();
+    _catalogTimer?.cancel();
+    if (_authenticatedUserId() != null) {
+      _catalogTimer = Timer.periodic(
+          const Duration(minutes: 2), (_) => unawaited(refreshCatalog()));
     }
-  }
-
-  static const _languageCycle = ['Español', 'Inglés', 'Francés'];
-  static const _durationRangeByGenre = {
-    'Comedia': [85, 100],
-    'Suspenso': [105, 130],
-    'Acción': [100, 135],
-    'Infantil': [45, 65],
-    'Romance': [90, 110],
-  };
-
-  String _defaultLanguageFor(int index) =>
-      _languageCycle[index % _languageCycle.length];
-
-  int _defaultDurationFor(String genre, int index) {
-    final range = _durationRangeByGenre[genre] ?? [80, 110];
-    return range[0] + ((index * 7) % (range[1] - range[0] + 1));
   }
 
   String _profilesKey(String userId) => 'profiles:$userId';

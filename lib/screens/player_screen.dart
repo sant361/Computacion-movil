@@ -1,382 +1,316 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import 'fullscreen_player_screen.dart';
+import '../data/catalog_item.dart';
+import '../playback/playback_support.dart';
 import '../state/app_state.dart';
+import 'fullscreen_player_screen.dart';
 
-/// Req. 20-27, 29, 30, 34, 48: reproductor de video (Serie).
-///
-/// Usa el video de muestra público de Flutter para que la pantalla reproduzca
-/// contenido real sin depender de un backend. Para producción, reemplaza la
-/// URL de [_sampleVideoUrl] por la del video real del episodio.
 class PlayerScreen extends StatefulWidget {
+  const PlayerScreen(
+      {super.key,
+      this.contentTitle = 'Serie · Temporada 1',
+      this.controllerFactory});
   final String contentTitle;
-  const PlayerScreen({super.key, this.contentTitle = 'Serie · Temporada 1'});
-
+  final VideoPlayerController Function(Uri)? controllerFactory;
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
 class _PlayerScreenState extends State<PlayerScreen>
     with WidgetsBindingObserver {
-  static const _sampleVideoUrl =
-      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
-
-  late final VideoPlayerController _controller;
-  bool _autoplay = true;
+  VideoPlayerController? _controller;
+  CatalogItem? _item;
   late final String _playbackScope;
-  bool _restored = false;
-  bool _wasPlaying = false;
-  int _lastSavedSecond = -1;
-
+  bool _ready = false;
   bool? _liked;
-  String _subtitles = 'Desactivados';
-  String _audioLang = 'Español';
-  String _quality = 'Auto';
+  bool _switching = false;
+  bool _wasPlaying = false;
+  bool _fullscreenOpen = false;
+  int _lastSavedSecond = -1;
+  int _generation = 0;
+  String? _error;
+  String? _accessError;
+
+  String get _progressKey => _item!.title;
+  bool get _canControl =>
+      _ready && !_switching && _accessError == null && _error == null;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _playbackScope = appState.playbackScope;
-    _controller = VideoPlayerController.networkUrl(Uri.parse(_sampleVideoUrl));
-    _controller.addListener(_onPlaybackChanged);
-    _initialize();
+    appState.addListener(_onAppChanged);
+    _item = appState.catalogItem(widget.contentTitle);
+    final item = _item;
+    if (item == null) {
+      _accessError = 'Este contenido no está disponible para este perfil.';
+      return;
+    }
+    unawaited(_openVideo());
   }
 
-  Future<void> _initialize() async {
-    try {
-      final saved = await appState.prepareWatchProgress(widget.contentTitle);
-      if (!mounted) return;
-      await _controller.initialize();
-      if (!mounted) return;
-      if (saved != null &&
-          saved.positionMs < _controller.value.duration.inMilliseconds) {
-        await _controller.seekTo(Duration(milliseconds: saved.positionMs));
+  void _onAppChanged() {
+    if (!mounted) return;
+    final current = appState.catalogItem(widget.contentTitle);
+    if (_accessError == null &&
+        (_playbackScope != appState.playbackScope || current == null)) {
+      _accessError = 'El perfil cambió o ya no tiene acceso a este contenido.';
+      _controller?.pause();
+      if (_fullscreenOpen) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _fullscreenOpen) Navigator.of(context).pop();
+        });
       }
-      if (!mounted) return;
-      _restored = true;
-      setState(() {});
-      if (_autoplay) await _controller.play();
+    }
+    setState(() {});
+  }
+
+  Future<void> _openVideo() async {
+    final item = _item;
+    if (item == null) return;
+    final source = item.videoUrl;
+    if (!isPlayableUrl(source)) {
+      if (mounted) {
+        setState(
+            () => _error = 'Este título todavía no tiene un video disponible.');
+      }
+      return;
+    }
+    final generation = ++_generation;
+    final controller = widget.controllerFactory?.call(Uri.parse(source)) ??
+        VideoPlayerController.networkUrl(Uri.parse(source));
+    _controller = controller;
+    controller.addListener(_onPlaybackChanged);
+    try {
+      final saved = await appState.prepareWatchProgress(_progressKey);
+      if (!mounted || generation != _generation) return;
+      await controller.initialize().timeout(const Duration(seconds: 20));
+      if (!mounted || generation != _generation) return;
+      if (saved != null &&
+          saved.positionMs < controller.value.duration.inMilliseconds) {
+        await controller.seekTo(Duration(milliseconds: saved.positionMs));
+      }
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _ready = true;
+        _error = null;
+      });
+      if (_accessError == null) await controller.play();
     } catch (_) {
-      if (mounted) setState(() {});
+      if (mounted && generation == _generation) {
+        setState(() => _error =
+            'No se pudo cargar el video. Revisa tu conexión y vuelve a intentarlo.');
+      }
     }
   }
 
   void _onPlaybackChanged() {
     if (!mounted) return;
-    setState(() {});
-    final stopped = _wasPlaying && !_controller.value.isPlaying;
-    _wasPlaying = _controller.value.isPlaying;
-    if (_restored && stopped) {
-      unawaited(_saveProgress(sync: true));
+    final controller = _controller;
+    if (controller == null) return;
+    if (controller.value.hasError && _error == null) {
+      _error =
+          'La reproducción se interrumpió. Revisa tu conexión y vuelve a intentarlo.';
     }
-    final second = _controller.value.position.inSeconds;
-    if (_restored && second != _lastSavedSecond) {
+    final stopped = _wasPlaying && !controller.value.isPlaying;
+    _wasPlaying = controller.value.isPlaying;
+    if (_ready && stopped) unawaited(_saveProgress(sync: true));
+    final second = controller.value.position.inSeconds;
+    if (_ready && second != _lastSavedSecond) {
       _lastSavedSecond = second;
       unawaited(_saveProgress());
     }
+    setState(() {});
   }
 
   Future<void> _saveProgress({bool sync = false}) async {
-    if (!_restored || !_controller.value.isInitialized) return;
+    final controller = _controller;
+    if (!_ready || controller == null || !controller.value.isInitialized) {
+      return;
+    }
     try {
       await appState.saveWatchProgress(
-        widget.contentTitle,
-        _controller.value.position,
-        _controller.value.duration,
-        scope: _playbackScope,
-      );
+          _progressKey, controller.value.position, controller.value.duration,
+          scope: _playbackScope);
       if (sync) unawaited(appState.syncWatchProgress());
-    } catch (_) {
-      // La reproducción puede continuar si falla el almacenamiento local.
-    }
+    } catch (_) {}
+  }
+
+  Future<void> _retry() async {
+    if (_switching || _accessError != null) return;
+    setState(() {
+      _switching = true;
+      _error = null;
+      _ready = false;
+    });
+    final old = _controller;
+    old?.removeListener(_onPlaybackChanged);
+    if (old != null) unawaited(old.dispose());
+    if (!mounted) return;
+    setState(() {
+      _controller = null;
+      _switching = false;
+    });
+    await _openVideo();
+  }
+
+  Future<void> _fullscreen() async {
+    final controller = _controller;
+    if (!_canControl || controller == null) return;
+    _fullscreenOpen = true;
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => FullscreenPlayerScreen(controller: controller),
+            fullscreenDialog: true));
+    _fullscreenOpen = false;
+    if (!mounted) return;
+  }
+
+  void _seekBy(Duration offset) {
+    final controller = _controller!;
+    final target = controller.value.position + offset;
+    controller.seekTo(Duration(
+        milliseconds: target.inMilliseconds
+            .clamp(0, controller.value.duration.inMilliseconds)));
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
       unawaited(_saveProgress(sync: true));
-      _controller.pause();
+      _controller?.pause();
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    appState.removeListener(_onAppChanged);
     unawaited(_saveProgress(sync: true));
-    _controller.removeListener(_onPlaybackChanged);
-    _controller.dispose();
+    _generation++;
+    _controller?.removeListener(_onPlaybackChanged);
+    _controller?.dispose();
     super.dispose();
-  }
-
-  void _togglePlayPause() {
-    setState(() {
-      _controller.value.isPlaying ? _controller.pause() : _controller.play();
-    });
-  }
-
-  void _seekBy(Duration offset) {
-    final target = _controller.value.position + offset;
-    _controller.seekTo(target);
-  }
-
-  void _toggleMute() {
-    setState(
-        () => _controller.setVolume(_controller.value.volume == 0 ? 1 : 0));
-  }
-
-  Future<void> _pickOption({
-    required String title,
-    required List<String> options,
-    required String current,
-    required ValueChanged<String> onSelected,
-  }) async {
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(title,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-            ...options.map(
-              (o) => RadioListTile(
-                value: o,
-                groupValue: current,
-                title: Text(o),
-                onChanged: (v) => Navigator.pop(context, v),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (choice != null) onSelected(choice);
-  }
-
-  String _formatDuration(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isReady = _controller.value.isInitialized;
-
+    final controller = _controller;
+    final ready = _canControl && controller != null;
+    final error = _accessError ?? _error;
     return Scaffold(
       appBar: AppBar(title: Text(widget.contentTitle)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          GestureDetector(
-            onTap: isReady ? _togglePlayPause : null,
-            child: AspectRatio(
-              aspectRatio: isReady ? _controller.value.aspectRatio : 16 / 9,
-              child: isReady
-                  ? Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        VideoPlayer(_controller),
-                        if (!_controller.value.isPlaying)
-                          Container(
-                            color: Colors.black26,
-                            child: const Icon(Icons.play_arrow,
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        AspectRatio(
+            aspectRatio: ready ? controller.value.aspectRatio : 16 / 9,
+            child: error != null
+                ? Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text(error, textAlign: TextAlign.center),
+                    if (_accessError == null && controller != null)
+                      TextButton(
+                          onPressed: _retry, child: const Text('Reintentar')),
+                  ]))
+                : ready
+                    ? GestureDetector(
+                        onTap: () => controller.value.isPlaying
+                            ? controller.pause()
+                            : controller.play(),
+                        child: Stack(alignment: Alignment.center, children: [
+                          VideoPlayer(controller),
+                          if (!controller.value.isPlaying)
+                            const Icon(Icons.play_arrow,
                                 size: 56, color: Colors.white),
-                          ),
-                      ],
-                    )
-                  : Container(
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFEEF0F4),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Center(
-                          child: _controller.value.hasError
-                              ? const Text('No se pudo cargar el video.')
-                              : const CircularProgressIndicator()),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (isReady) ...[
-            VideoProgressIndicator(_controller,
-                allowScrubbing: true, padding: EdgeInsets.zero),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                '${_formatDuration(_controller.value.position)} / ${_formatDuration(_controller.value.duration)}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ),
-          ] else
-            const LinearProgressIndicator(value: 0),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.replay_10),
-                onPressed: isReady
-                    ? () => _seekBy(const Duration(seconds: -10))
-                    : null,
-              ),
-              IconButton(
-                icon: Icon(isReady && _controller.value.isPlaying
-                    ? Icons.pause
-                    : Icons.play_arrow),
-                onPressed: isReady ? _togglePlayPause : null,
-              ),
-              IconButton(
-                icon: const Icon(Icons.forward_10),
-                onPressed:
-                    isReady ? () => _seekBy(const Duration(seconds: 10)) : null,
-              ),
-              IconButton(
-                icon: Icon(isReady && _controller.value.volume == 0
-                    ? Icons.volume_off
-                    : Icons.volume_up),
-                onPressed: isReady ? _toggleMute : null,
-              ),
-              IconButton(
-                icon: const Icon(Icons.fullscreen),
-                onPressed: isReady
-                    ? () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                FullscreenPlayerScreen(controller: _controller),
-                            fullscreenDialog: true,
-                          ),
-                        )
-                    : null,
-              ),
-            ],
-          ),
-          Wrap(
-            spacing: 8,
-            children: [
-              ActionChip(
-                label: Text('CC: $_subtitles'), // req. 29 subtítulos
-                onPressed: () => _pickOption(
-                  title: 'Subtítulos',
-                  options: const [
-                    'Desactivados',
-                    'Español',
-                    'Inglés',
-                    'Portugués'
-                  ],
-                  current: _subtitles,
-                  onSelected: (v) => setState(() => _subtitles = v),
-                ),
-              ),
-              ActionChip(
-                label: Text('Audio: $_audioLang'), // req. 30 idioma de audio
-                onPressed: () => _pickOption(
-                  title: 'Idioma de audio',
-                  options: const ['Español', 'Inglés', 'Portugués'],
-                  current: _audioLang,
-                  onSelected: (v) => setState(() => _audioLang = v),
-                ),
-              ),
-              ActionChip(
-                label: Text('Calidad: $_quality'), // req. 26 calidad de video
-                onPressed: () => _pickOption(
-                  title: 'Calidad de video',
-                  options: const ['Auto', '480p', '720p', '1080p'],
-                  current: _quality,
-                  onSelected: (v) => setState(() => _quality = v),
-                ),
-              ),
-            ],
-          ),
-          SwitchListTile(
-            value: _autoplay,
-            onChanged: (v) => setState(() => _autoplay = v),
-            title: const Text('Autoplay'), // req. 27
-          ),
-          OutlinedButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text('Reproduciendo siguiente episodio (demo)')),
-            ),
-            child: const Text('Siguiente episodio ▶'),
-          ),
+                        ]))
+                    : const Center(child: CircularProgressIndicator())),
+        if (ready) ...[
+          VideoProgressIndicator(controller, allowScrubbing: true),
+          Text(
+              '${formatPlaybackTime(controller.value.position)} / ${formatPlaybackTime(controller.value.duration)}'),
+        ],
+        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+          IconButton(
+              tooltip: 'Retroceder 10 segundos',
+              icon: const Icon(Icons.replay_10),
+              onPressed:
+                  ready ? () => _seekBy(const Duration(seconds: -10)) : null),
+          IconButton(
+              tooltip:
+                  ready && controller.value.isPlaying ? 'Pausar' : 'Reproducir',
+              icon: Icon(ready && controller.value.isPlaying
+                  ? Icons.pause
+                  : Icons.play_arrow),
+              onPressed: ready
+                  ? () => controller.value.isPlaying
+                      ? controller.pause()
+                      : controller.play()
+                  : null),
+          IconButton(
+              tooltip: 'Avanzar 10 segundos',
+              icon: const Icon(Icons.forward_10),
+              onPressed:
+                  ready ? () => _seekBy(const Duration(seconds: 10)) : null),
+          IconButton(
+              tooltip: 'Silenciar',
+              icon: Icon(ready && controller.value.volume == 0
+                  ? Icons.volume_off
+                  : Icons.volume_up),
+              onPressed: ready
+                  ? () =>
+                      controller.setVolume(controller.value.volume == 0 ? 1 : 0)
+                  : null),
+          IconButton(
+              tooltip: 'Pantalla completa',
+              icon: const Icon(Icons.fullscreen),
+              onPressed: ready ? _fullscreen : null),
+        ]),
+        ...[
+          TextButton.icon(
+              icon: const Icon(Icons.replay),
+              label: const Text('Ver desde inicio'),
+              onPressed: ready
+                  ? () async {
+                      await controller.seekTo(Duration.zero);
+                      await _saveProgress(sync: true);
+                      if (mounted && _accessError == null) {
+                        await controller.play();
+                      }
+                    }
+                  : null),
           const SizedBox(height: 16),
-          Text(widget.contentTitle,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              IconButton(
+          Row(children: [
+            IconButton(
+                tooltip: 'Me gusta',
                 icon: Icon(
                     _liked == true ? Icons.thumb_up : Icons.thumb_up_outlined),
-                onPressed: () =>
-                    setState(() => _liked = _liked == true ? null : true),
-              ), // req. 31 calificación
-              IconButton(
+                onPressed: _accessError == null
+                    ? () =>
+                        setState(() => _liked = _liked == true ? null : true)
+                    : null),
+            IconButton(
+                tooltip: 'No me gusta',
                 icon: Icon(_liked == false
                     ? Icons.thumb_down
                     : Icons.thumb_down_outlined),
-                onPressed: () =>
-                    setState(() => _liked = _liked == false ? null : false),
-              ),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: () {
-                  appState.toggleMyList(widget.contentTitle);
-                  setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        appState.isInMyList(widget.contentTitle)
-                            ? 'Agregado a Mi lista'
-                            : 'Quitado de Mi lista',
-                      ),
-                    ),
-                  );
-                }, // req. 34 mi lista
-                icon: Icon(
-                    appState.isInMyList(widget.contentTitle)
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    size: 18),
-                label: const Text('Lista'),
-              ),
-            ],
-          ),
-          TextButton.icon(
-            icon: const Icon(Icons.replay),
-            label: const Text('Ver desde inicio'),
-            onPressed: isReady && _restored
-                ? () async {
-                    await _controller.seekTo(Duration.zero);
-                    await _saveProgress();
-                    if (mounted) await _controller.play();
-                  }
-                : null,
-          ),
-          CheckboxListTile(
-            value: false,
-            onChanged: (_) {},
-            title: const Text('Episodios'),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Enlace copiado para compartir')),
-              ), // req. 48 compartir
-              icon: const Icon(Icons.share, size: 18),
-              label: const Text('Compartir'),
-            ),
-          ),
+                onPressed: _accessError == null
+                    ? () =>
+                        setState(() => _liked = _liked == false ? null : false)
+                    : null),
+            const Spacer(),
+            OutlinedButton.icon(
+                onPressed: _accessError == null
+                    ? () => appState.toggleMyList(widget.contentTitle)
+                    : null,
+                icon: Icon(appState.isInMyList(widget.contentTitle)
+                    ? Icons.favorite
+                    : Icons.favorite_border),
+                label: const Text('Mi lista')),
+          ]),
         ],
-      ),
+      ]),
     );
   }
 }

@@ -16,7 +16,9 @@ class ContentPanelScreen extends StatelessWidget {
   Future<void> _addContent(BuildContext context) async {
     if (!appState.isAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Solo los administradores pueden agregar contenido.')),
+        const SnackBar(
+            content:
+                Text('Solo los administradores pueden agregar contenido.')),
       );
       return;
     }
@@ -28,10 +30,13 @@ class ContentPanelScreen extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await appState.addCatalogItem(item);
-      messenger.showSnackBar(SnackBar(content: Text('"${item.title}" agregado al catálogo')));
+      messenger.showSnackBar(
+          SnackBar(content: Text('"${item.title}" agregado al catálogo')));
     } catch (_) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('No se pudo guardar. Revisa tu conexión e intenta de nuevo.')),
+        const SnackBar(
+            content: Text(
+                'No se pudo guardar. Revisa tu conexión e intenta de nuevo.')),
       );
     }
   }
@@ -54,33 +59,58 @@ class ContentPanelScreen extends StatelessWidget {
           ...items.map(
             (c) => Card(
               child: ListTile(
-                leading: Container(width: 40, height: 40, color: const Color(0xFFEEF0F4)),
-                title: Text(c['nombre'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
+                leading: Container(
+                    width: 40, height: 40, color: const Color(0xFFEEF0F4)),
+                title: Text(c['nombre'] as String,
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Chip(
-                  label: Text(c['estado'] as String, style: TextStyle(color: c['color'] as Color)),
+                  label: Text(c['estado'] as String,
+                      style: TextStyle(color: c['color'] as Color)),
                   visualDensity: VisualDensity.compact,
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editar contenido (demo)')))),
-                    IconButton(icon: const Icon(Icons.delete_outline, size: 18), onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contenido eliminado (demo)')))),
+                    IconButton(
+                        icon: const Icon(Icons.edit, size: 18),
+                        onPressed: () => ScaffoldMessenger.of(context)
+                            .showSnackBar(const SnackBar(
+                                content: Text('Editar contenido (demo)')))),
+                    IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        onPressed: () => ScaffoldMessenger.of(context)
+                            .showSnackBar(const SnackBar(
+                                content: Text('Contenido eliminado (demo)')))),
                   ],
                 ),
               ),
             ),
           ),
           const Divider(height: 32),
-          const Text('Temporadas y episodios', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('Temporadas y episodios',
+              style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo panel de temporadas (demo)'))), child: const Text('Panel de temporadas')),
+          OutlinedButton(
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Abriendo panel de temporadas (demo)'))),
+              child: const Text('Panel de temporadas')),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo panel de episodios (demo)'))), child: const Text('Panel de episodios')),
+          OutlinedButton(
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Abriendo panel de episodios (demo)'))),
+              child: const Text('Panel de episodios')),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo formulario de carga (demo)'))), child: const Text('Formulario de carga multimedia')),
+          OutlinedButton(
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Abriendo formulario de carga (demo)'))),
+              child: const Text('Formulario de carga multimedia')),
           const SizedBox(height: 16),
           const Center(
-            child: Text('Estados: borrador · revisión · programado', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            child: Text('Estados: borrador · revisión · programado',
+                style: TextStyle(fontSize: 11, color: Colors.grey)),
           ),
         ],
       ),
@@ -97,11 +127,19 @@ class _NewContentDialog extends StatefulWidget {
 }
 
 class _NewContentDialogState extends State<_NewContentDialog> {
-  static const _genres = ['Comedia', 'Suspenso', 'Acción', 'Infantil', 'Romance'];
+  static const _genres = [
+    'Comedia',
+    'Suspenso',
+    'Acción',
+    'Infantil',
+    'Romance'
+  ];
   static const _languages = ['Español', 'Inglés', 'Francés'];
 
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
+  final _videoController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _yearController = TextEditingController(text: '${DateTime.now().year}');
   final _durationController = TextEditingController(text: '90');
   String _genre = _genres.first;
@@ -110,6 +148,8 @@ class _NewContentDialogState extends State<_NewContentDialog> {
   @override
   void dispose() {
     _titleController.dispose();
+    _videoController.dispose();
+    _descriptionController.dispose();
     _yearController.dispose();
     _durationController.dispose();
     super.dispose();
@@ -121,6 +161,8 @@ class _NewContentDialogState extends State<_NewContentDialog> {
       context,
       CatalogItem(
         title: _titleController.text.trim(),
+        videoUrl: _videoController.text.trim(),
+        description: _descriptionController.text.trim(),
         genre: _genre,
         year: int.parse(_yearController.text.trim()),
         language: _language,
@@ -143,18 +185,42 @@ class _NewContentDialogState extends State<_NewContentDialog> {
                 controller: _titleController,
                 decoration: const InputDecoration(labelText: 'Título'),
                 textCapitalization: TextCapitalization.sentences,
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Escribe un título' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Escribe un título'
+                    : null,
+              ),
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(labelText: 'Sinopsis'),
+                maxLines: 3,
+              ),
+              TextFormField(
+                controller: _videoController,
+                decoration: const InputDecoration(labelText: 'URL del video'),
+                keyboardType: TextInputType.url,
+                validator: (value) {
+                  final uri = Uri.tryParse(value?.trim() ?? '');
+                  return uri != null &&
+                          ['http', 'https'].contains(uri.scheme) &&
+                          uri.host.isNotEmpty
+                      ? null
+                      : 'Escribe una URL http o https válida.';
+                },
               ),
               DropdownButtonFormField<String>(
                 value: _genre,
                 decoration: const InputDecoration(labelText: 'Género'),
-                items: _genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                items: _genres
+                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                    .toList(),
                 onChanged: (v) => setState(() => _genre = v ?? _genre),
               ),
               DropdownButtonFormField<String>(
                 value: _language,
                 decoration: const InputDecoration(labelText: 'Idioma'),
-                items: _languages.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                items: _languages
+                    .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                    .toList(),
                 onChanged: (v) => setState(() => _language = v ?? _language),
               ),
               TextFormField(
@@ -165,7 +231,9 @@ class _NewContentDialogState extends State<_NewContentDialog> {
                 maxLength: 4,
                 validator: (v) {
                   final year = int.tryParse(v ?? '');
-                  if (year == null || year < 1900 || year > DateTime.now().year + 1) {
+                  if (year == null ||
+                      year < 1900 ||
+                      year > DateTime.now().year + 1) {
                     return 'Año no válido';
                   }
                   return null;
@@ -173,13 +241,16 @@ class _NewContentDialogState extends State<_NewContentDialog> {
               ),
               TextFormField(
                 controller: _durationController,
-                decoration: const InputDecoration(labelText: 'Duración (minutos)'),
+                decoration:
+                    const InputDecoration(labelText: 'Duración (minutos)'),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 maxLength: 3,
                 validator: (v) {
                   final minutes = int.tryParse(v ?? '');
-                  if (minutes == null || minutes < 1) return 'Duración no válida';
+                  if (minutes == null || minutes < 1) {
+                    return 'Duración no válida';
+                  }
                   return null;
                 },
               ),
@@ -188,7 +259,9 @@ class _NewContentDialogState extends State<_NewContentDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar')),
         TextButton(onPressed: _submit, child: const Text('Guardar')),
       ],
     );

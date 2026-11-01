@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'catalog/profiles_screen.dart';
 import 'catalog/my_list_screen.dart';
+import 'catalog/viewing_history_screen.dart';
 import 'catalog/parental_control_screen.dart';
 import 'admin/admin_dashboard_screen.dart';
 import 'search_screen.dart';
@@ -76,6 +77,15 @@ class MenuScreen extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                             builder: (_) => const MyListScreen())),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.history),
+                    title: const Text('Historial de reproducción'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ViewingHistoryScreen())),
                   ),
                   if (!appState
                       .profileDetails(appState.activeProfile ?? '')

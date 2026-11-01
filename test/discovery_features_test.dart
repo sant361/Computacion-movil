@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:streaming_app/screens/search_screen.dart';
 import 'package:streaming_app/screens/catalog/my_list_screen.dart';
+import 'package:streaming_app/screens/catalog/viewing_history_screen.dart';
 import 'package:streaming_app/state/app_state.dart';
 import 'package:streaming_app/widgets/catalog_artwork.dart';
 
@@ -58,6 +59,26 @@ void main() {
     expect(find.text('Risas en el aire'), findsNothing);
     expect(find.text('Guarda títulos desde su ficha para encontrarlos aquí.'),
         findsOneWidget);
+  });
+
+  testWidgets('el historial solo se borra tras confirmar', (tester) async {
+    await appState.loadProfiles('historial-ui');
+    await appState.saveWatchProgress('Risas en el aire',
+        const Duration(seconds: 20), const Duration(seconds: 100),
+        scope: appState.playbackScope);
+    await tester.pumpWidget(const MaterialApp(home: ViewingHistoryScreen()));
+    expect(find.text('Risas en el aire'), findsOneWidget);
+    await tester.tap(find.byTooltip('Borrar historial'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Risas en el aire'), findsOneWidget);
+    await tester.tap(find.byTooltip('Borrar historial'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Borrar historial').last);
+    await tester.pumpAndSettle();
+    expect(
+        find.text('Aún no hay reproducciones en este perfil.'), findsOneWidget);
   });
 
   testWidgets('una portada vacía o inválida conserva una imagen de respaldo',

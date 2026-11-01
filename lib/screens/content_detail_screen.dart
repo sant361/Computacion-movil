@@ -13,14 +13,31 @@ class ContentDetailScreen extends StatefulWidget {
 }
 
 class _ContentDetailScreenState extends State<ContentDetailScreen> {
+  int? _season;
   bool? _liked;
 
-  void _play(CatalogItem item) {
+  void _play(CatalogItem item, {CatalogEpisode? episode}) {
     if (appState.catalogItem(item.title) == null) return;
     Navigator.push(
         context,
         MaterialPageRoute(
-            builder: (_) => PlayerScreen(contentTitle: item.title)));
+            builder: (_) =>
+                PlayerScreen(contentTitle: item.title, episode: episode)));
+  }
+
+  CatalogEpisode? _resumeEpisode(CatalogItem item) {
+    final episodes = orderedEpisodes(item);
+    if (episodes.isEmpty) return null;
+    final pending = episodes
+        .where((entry) =>
+            appState.watchProgress(entry.progressKey(item.title)) != null)
+        .toList()
+      ..sort((a, b) => appState
+          .watchProgress(b.progressKey(item.title))!
+          .updatedAt
+          .compareTo(
+              appState.watchProgress(a.progressKey(item.title))!.updatedAt));
+    return pending.isNotEmpty ? pending.first : episodes.first;
   }
 
   @override
@@ -36,8 +53,15 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                     child: Text(
                         'Este contenido no está disponible para este perfil.')));
           }
-          final progress = appState.watchProgress(item.title);
-          final playable = isPlayableUrl(item.videoUrl);
+          final episodes = orderedEpisodes(item);
+          final seasons = episodes.map((entry) => entry.season).toSet().toList()
+            ..sort();
+          final season =
+              seasons.contains(_season) ? _season : seasons.firstOrNull;
+          final start = _resumeEpisode(item);
+          final progress = appState
+              .watchProgress(start?.progressKey(item.title) ?? item.title);
+          final playable = isPlayableUrl(start?.videoUrl ?? item.videoUrl);
           final liked = _liked;
           return Scaffold(
               body: CustomScrollView(slivers: [
@@ -61,7 +85,7 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                   Text(
                       '${item.year} · ${item.genre} · ${item.language} · ${item.rating}',
                       style: const TextStyle(color: Colors.grey)),
-                  Text('${item.durationMinutes} minutos'),
+                  if (episodes.isEmpty) Text('${item.durationMinutes} minutos'),
                   const SizedBox(height: 16),
                   Text(item.description.isEmpty
                       ? 'La sinopsis todavía no está disponible.'
@@ -71,7 +95,8 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                       icon: const Icon(Icons.play_arrow),
                       label: Text(
                           progress == null ? 'REPRODUCIR' : 'CONTINUAR VIENDO'),
-                      onPressed: playable ? () => _play(item) : null),
+                      onPressed:
+                          playable ? () => _play(item, episode: start) : null),
                   if (!playable)
                     const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
@@ -134,6 +159,42 @@ class _ContentDetailScreenState extends State<ContentDetailScreen> {
                                     content: Text('Agregado a Descargas.')));
                           },
                   ),
+                  if (episodes.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    DropdownButtonFormField<int>(
+                        value: season,
+                        decoration:
+                            const InputDecoration(labelText: 'Temporada'),
+                        items: seasons
+                            .map((number) => DropdownMenuItem(
+                                value: number,
+                                child: Text('Temporada $number')))
+                            .toList(),
+                        onChanged: (value) => setState(() => _season = value)),
+                    const SizedBox(height: 8),
+                    ...episodes
+                        .where((entry) => entry.season == season)
+                        .map((episode) {
+                      final episodeProgress = appState
+                          .watchProgress(episode.progressKey(item.title));
+                      return Card(
+                          child: Column(children: [
+                        ListTile(
+                            title: Text('${episode.number}. ${episode.title}'),
+                            subtitle: Text(episodeProgress == null
+                                ? '${episode.durationMinutes} minutos'
+                                : 'Continuar desde ${formatPlaybackTime(Duration(milliseconds: episodeProgress.positionMs))}'),
+                            trailing: const Icon(Icons.play_circle_outline),
+                            enabled: isPlayableUrl(episode.videoUrl),
+                            onTap: isPlayableUrl(episode.videoUrl)
+                                ? () => _play(item, episode: episode)
+                                : null),
+                        if (episodeProgress != null)
+                          LinearProgressIndicator(
+                              value: episodeProgress.fraction),
+                      ]));
+                    }),
+                  ],
                 ]))),
           ]));
         });

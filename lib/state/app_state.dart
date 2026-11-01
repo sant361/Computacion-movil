@@ -83,7 +83,11 @@ class AppState extends ChangeNotifier {
   void _startProgressSync() {
     _stopProgressSync();
     final uid = _profileUserId;
-    if (uid == null || uid != _authenticatedUserId()) return;
+    if (uid == null ||
+        uid != _authenticatedUserId() ||
+        (Firebase.apps.isEmpty && _progressStore is FirestoreProgressStore)) {
+      return;
+    }
     final generation = _syncGeneration;
     _firstProgressSnapshot = Completer<void>();
     _progressSubscription = _progressStore.watch(uid).listen((records) {
@@ -95,7 +99,7 @@ class AppState extends ChangeNotifier {
         final history = _watchHistory.putIfAbsent(scope, () => {});
         final local = history[record.title];
         if (local == null || record.updatedAt >= local.updatedAt) {
-          _rememberViewed(scope, record.title, record.positionMs);
+          _rememberViewed(scope, _parentTitle(record.title), record.positionMs);
           history[record.title] = WatchProgress(
               record.positionMs, record.durationMs, record.updatedAt);
           _pendingProgress[scope]?.remove(record.title);
@@ -221,6 +225,40 @@ class AppState extends ChangeNotifier {
   final Future<bool> Function(String)? _adminStatus;
   Timer? _catalogTimer;
 
+  String _parentTitle(String key) {
+    for (final item in _catalog) {
+      if (item.title == key ||
+          item.episodes.any((e) => e.progressKey(item.title) == key)) {
+        return item.title;
+      }
+    }
+    return key.split(' · T').first;
+  }
+
+  WatchProgress? continueProgress(CatalogItem item) {
+    final keys = [
+      item.title,
+      ...item.episodes.map((e) => e.progressKey(item.title))
+    ];
+    final rows = keys
+        .where((k) => true)
+        .map(watchProgress)
+        .whereType<WatchProgress>()
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  CatalogEpisode? mostRecentEpisode(CatalogItem item) {
+    final rows = item.episodes
+        .where((e) => watchProgress(e.progressKey(item.title)) != null)
+        .toList()
+      ..sort((a, b) => watchProgress(b.progressKey(item.title))!
+          .updatedAt
+          .compareTo(watchProgress(a.progressKey(item.title))!.updatedAt));
+    return rows.isEmpty ? null : rows.first;
+  }
+
   static const _tokenBalanceKey = 'tokenBalance';
   static const _myListKey = 'myList';
   static const _isLoggedInKey = 'isLoggedIn';
@@ -280,7 +318,7 @@ class AppState extends ChangeNotifier {
     final history = _watchHistory.putIfAbsent(scope, () => {});
     final milliseconds =
         position.inMilliseconds.clamp(0, duration.inMilliseconds);
-    _rememberViewed(scope, title, milliseconds);
+    _rememberViewed(scope, _parentTitle(title), milliseconds);
     final previous = history[title]?.updatedAt ?? 0;
     final now = DateTime.now().microsecondsSinceEpoch;
     final updated = now > previous ? now : previous + 1;
@@ -320,7 +358,8 @@ class AppState extends ChangeNotifier {
           final values = item.value as List;
           final position = values[0] as int;
           final duration = values[1] as int;
-          _rememberViewed(entry.key as String, item.key as String, position);
+          _rememberViewed(
+              entry.key as String, _parentTitle(item.key as String), position);
           if (position >= 0 && duration > position) {
             history[item.key as String] = WatchProgress(
                 position, duration, values.length > 2 ? values[2] as int : 0);

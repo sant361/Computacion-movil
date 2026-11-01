@@ -225,6 +225,7 @@ class AppState extends ChangeNotifier {
   final Future<bool> Function(String)? _adminStatus;
   Timer? _catalogTimer;
   final Map<String, Set<String>> _favoriteLists = {};
+  final Map<String, Set<String>> _hiddenContinue = {};
 
   String _parentTitle(String key) {
     for (final item in _catalog) {
@@ -242,7 +243,7 @@ class AppState extends ChangeNotifier {
       ...item.episodes.map((e) => e.progressKey(item.title))
     ];
     final rows = keys
-        .where((k) => true)
+        .where((k) => !(_hiddenContinue[playbackScope] ?? {}).contains(k))
         .map(watchProgress)
         .whereType<WatchProgress>()
         .toList()
@@ -252,7 +253,10 @@ class AppState extends ChangeNotifier {
 
   CatalogEpisode? mostRecentEpisode(CatalogItem item) {
     final rows = item.episodes
-        .where((e) => watchProgress(e.progressKey(item.title)) != null)
+        .where((e) =>
+            watchProgress(e.progressKey(item.title)) != null &&
+            !(_hiddenContinue[playbackScope] ?? {})
+                .contains(e.progressKey(item.title)))
         .toList()
       ..sort((a, b) => watchProgress(b.progressKey(item.title))!
           .updatedAt
@@ -267,9 +271,30 @@ class AppState extends ChangeNotifier {
   List<String> get myListTitles =>
       _currentFavorites.where((t) => catalogItem(t) != null).toList();
 
+  Future<void> removeFromContinueWatching(String title) async {
+    final keys = (_watchHistory[playbackScope] ?? {})
+        .keys
+        .where((k) => k == title || _parentTitle(k) == title)
+        .toList();
+    _hiddenContinue.putIfAbsent(playbackScope, () => {}).addAll(keys);
+    for (final key in keys) {
+      final p = _watchHistory[playbackScope]![key]!;
+      await saveWatchProgress(
+          key, Duration.zero, Duration(milliseconds: p.durationMs),
+          scope: playbackScope);
+      _hiddenContinue.putIfAbsent(playbackScope, () => {}).add(key);
+    }
+    notifyListeners();
+    await _persistLibrary();
+    unawaited(syncWatchProgress());
+  }
+
   Future<void> _persistLibrary() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
-    for (final pair in {'favoriteLists': _favoriteLists}.entries) {
+    for (final pair in {
+      'favoriteLists': _favoriteLists,
+      'hiddenContinue': _hiddenContinue
+    }.entries) {
       await prefs.setString(pair.key,
           jsonEncode(pair.value.map((k, v) => MapEntry(k, v.toList()))));
     }
@@ -277,7 +302,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> _loadLibrary() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
-    for (final pair in {'favoriteLists': _favoriteLists}.entries) {
+    for (final pair in {
+      'favoriteLists': _favoriteLists,
+      'hiddenContinue': _hiddenContinue
+    }.entries) {
       pair.value.clear();
       try {
         final raw = jsonDecode(prefs.getString(pair.key) ?? '{}') as Map;
@@ -358,6 +386,7 @@ class AppState extends ChangeNotifier {
     final milliseconds =
         position.inMilliseconds.clamp(0, duration.inMilliseconds);
     _rememberViewed(scope, _parentTitle(title), milliseconds);
+    _hiddenContinue[scope]?.remove(title);
     final previous = history[title]?.updatedAt ?? 0;
     final now = DateTime.now().microsecondsSinceEpoch;
     final updated = now > previous ? now : previous + 1;

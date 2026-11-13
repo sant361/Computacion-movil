@@ -34,6 +34,15 @@ service cloud.firestore {
         && request.resource.data.cancelAtPeriodEnd is bool;
       allow delete: if false;
     }
+    match /users/{uid}/settings/{docId} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid) && docId == 'account'
+        && request.resource.data.keys().hasOnly(['tokenBalance','parentalMaxRating','parentalRestrictByProfile','parentalBlockPurchases','updatedAt'])
+        && request.resource.data.tokenBalance is int && request.resource.data.tokenBalance >= 0
+        && request.resource.data.parentalMaxRating in ['TP','+14','+18']
+        && request.resource.data.parentalRestrictByProfile is bool
+        && request.resource.data.parentalBlockPurchases is bool;
+    }
     match /users/{uid}/profiles/{profileId} {
       allow read: if owner(uid);
       allow create, update: if owner(uid)

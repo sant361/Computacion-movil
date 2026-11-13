@@ -81,6 +81,10 @@ class _AppStartupState extends State<AppStartup> {
       await appState.loadAdminStatus(Firebase.apps.isEmpty
           ? 'local'
           : FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      if (Firebase.apps.isNotEmpty) {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) await appState.syncAccountSettings(uid);
+      }
     }
   }
 

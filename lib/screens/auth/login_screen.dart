@@ -118,6 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
           FirebaseAuth.instance.currentUser?.uid ?? 'local');
       await appState
           .loadAdminStatus(FirebaseAuth.instance.currentUser?.uid ?? 'local');
+      if (signedIn != null) await appState.syncAccountSettings(signedIn.uid);
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

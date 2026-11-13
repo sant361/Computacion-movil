@@ -57,6 +57,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       await appState.loadProfiles(fresh.uid);
       await appState.loadParentalSettings(fresh.uid);
       await appState.loadAdminStatus(fresh.uid);
+      await appState.syncAccountSettings(fresh.uid);
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,

@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/catalog_item.dart';
+import '../services/account_settings_store.dart';
 import '../services/progress_store.dart';
 import '../services/profile_store.dart';
 import '../services/catalog_store.dart';
@@ -39,6 +40,7 @@ class AppState extends ChangeNotifier {
       Firebase.apps.isEmpty ? null : FirebaseAuth.instance.currentUser?.uid;
 
   final ProgressStore _progressStore;
+  final AccountSettingsStore _accountStore = const AccountSettingsStore();
   final String? Function() _authenticatedUserId;
   StreamSubscription<List<SyncedProgress>>? _progressSubscription;
   Timer? _syncTimer;
@@ -1100,6 +1102,7 @@ class AppState extends ChangeNotifier {
     _tokenHistory.insert(0, {'titulo': reason, 'valor': '+$amount'});
     notifyListeners();
     _persist();
+    unawaited(_pushAccountSettings());
   }
 
   bool spendTokens(int amount, {required String reason}) {
@@ -1108,6 +1111,7 @@ class AppState extends ChangeNotifier {
     _tokenHistory.insert(0, {'titulo': reason, 'valor': '-$amount'});
     notifyListeners();
     _persist();
+    unawaited(_pushAccountSettings());
     return true;
   }
 
@@ -1401,6 +1405,51 @@ class AppState extends ChangeNotifier {
         'restrictByProfile': restrictByProfile,
         'blockPurchases': blockPurchases,
         'pin': pin,
+      }),
+    );
+    unawaited(_pushAccountSettings());
+  }
+
+  /// Sube a Firestore el saldo de tokens y el control parental (sin el PIN)
+  /// para que la cuenta los conserve en otros dispositivos.
+  Future<void> _pushAccountSettings() async {
+    final uid = _authenticatedUserId();
+    if (uid == null) return;
+    await _accountStore.write(
+      uid,
+      AccountSettings(
+        tokenBalance: _tokenBalance,
+        parentalMaxRating: _parentalMaxRating,
+        parentalRestrictByProfile: _parentalRestrictByProfile,
+        parentalBlockPurchases: _parentalBlockPurchases,
+      ),
+    );
+  }
+
+  /// Trae de Firestore el saldo y el control parental de la cuenta. Si es la
+  /// primera vez (no hay datos en la nube), sube lo que hay en este equipo.
+  Future<void> syncAccountSettings(String userId) async {
+    final remote = await _accountStore.read(userId);
+    if (remote == null) {
+      await _pushAccountSettings();
+      return;
+    }
+    _tokenBalance = remote.tokenBalance;
+    if (parentalRatings.contains(remote.parentalMaxRating)) {
+      _parentalMaxRating = remote.parentalMaxRating;
+    }
+    _parentalRestrictByProfile = remote.parentalRestrictByProfile;
+    _parentalBlockPurchases = remote.parentalBlockPurchases;
+    notifyListeners();
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setInt(_tokenBalanceKey, _tokenBalance);
+    await prefs.setString(
+      _parentalKey(userId),
+      jsonEncode({
+        'maxRating': _parentalMaxRating,
+        'restrictByProfile': _parentalRestrictByProfile,
+        'blockPurchases': _parentalBlockPurchases,
+        'pin': _parentalPin,
       }),
     );
   }

@@ -1,4 +1,6 @@
-# Streaming App
+# +Wnovelas (Streaming App)
+
+Versión actual: **0.2.0+3**. Aplicación Flutter con Firebase (Authentication, Cloud Firestore y App Distribution).
 
 Proyecto base en Flutter para la aplicación móvil de streaming,
 construido a partir de los wireframes y los requerimientos funcionales.
@@ -16,6 +18,32 @@ lib/
     search_screen.dart
     player_screen.dart
 ```
+
+## Qué hace la app (resumen)
+
+- **Cuenta**: registro con correo y contraseña, verificación por enlace al correo, cambio de contraseña y recuperación. Cada cuenta se guarda en Firestore (`users/{uid}`).
+- **Catálogo** en Firestore (`catalog`), perfiles, Mi lista, descargas y reproductor con progreso sincronizado.
+- **Control parental** por clasificación (TP, +14, +18) con PIN.
+- **Planes y pagos** simulados; el plan elegido se guarda en `subscriptions/{uid}`.
+- **Tokens y anuncios simulados** con límite diario.
+- **Administración**: solo las cuentas con documento `admins/{uid}` pueden crear contenido.
+
+## Cómo generar el APK
+
+```
+flutter pub get
+flutter build apk --release
+```
+
+El archivo queda en `build/app/outputs/flutter-apk/app-release.apk`. Para repartirlo
+a compañeros o al profesor se sube a Firebase App Distribution y se comparte el
+vínculo de invitación.
+
+## Reglas de Firestore
+
+El archivo `firebase/firestore.rules` contiene las reglas completas del proyecto
+(`users`, `subscriptions`, `catalog`, `admins`, perfiles, progreso y eventos).
+Se publica en la consola de Firebase → Firestore Database → Reglas.
 
 ## Cómo continuar
 

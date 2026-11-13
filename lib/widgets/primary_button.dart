@@ -1,3 +1,4 @@
+import '../l10n/app_text.dart';
 import 'package:flutter/material.dart';
 
 /// Botón principal reutilizable en toda la app (Login, Pagar, Suscribirme, etc.)
@@ -14,7 +15,8 @@ class PrimaryButton extends StatelessWidget {
       height: 48,
       child: ElevatedButton(
         onPressed: onPressed,
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child:
+            AppText(label, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }

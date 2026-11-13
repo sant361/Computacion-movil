@@ -1,3 +1,5 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -17,15 +19,27 @@ class StreamingApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '+Wnovelas',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF3D5A80),
-        useMaterial3: true,
-      ),
-      home: const AppStartup(),
-    );
+    return ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) => MaterialApp(
+              title: '+Wnovelas',
+              locale: Locale(appState.languageCode),
+              supportedLocales: const [
+                Locale('es'),
+                Locale('en'),
+                Locale('fr')
+              ],
+              localizationsDelegates: const [
+                AppStrings.delegate,
+                ...GlobalMaterialLocalizations.delegates
+              ],
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                colorSchemeSeed: const Color(0xFF3D5A80),
+                useMaterial3: true,
+              ),
+              home: const AppStartup(),
+            ));
   }
 }
 
@@ -90,16 +104,18 @@ class _AppStartupState extends State<AppStartup> {
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.cloud_off_outlined, size: 48),
                 const SizedBox(height: 16),
-                const Text('No pudimos iniciar la aplicación',
+                const AppText('No pudimos iniciar la aplicación',
                     textAlign: TextAlign.center),
                 const SizedBox(height: 8),
-                const Text('Comprueba tu conexión y vuelve a intentarlo.',
+                const AppText('Comprueba tu conexión y vuelve a intentarlo.',
                     textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 FilledButton.icon(
-                    onPressed: () => setState(() { _pending = _start(); }),
+                    onPressed: () => setState(() {
+                          _pending = _start();
+                        }),
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar')),
+                    label: const AppText('Reintentar')),
               ]),
             ))),
           );
@@ -110,4 +126,3 @@ class _AppStartupState extends State<AppStartup> {
     );
   }
 }
-

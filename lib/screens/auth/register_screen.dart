@@ -1,3 +1,4 @@
+import '../../l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../widgets/primary_button.dart';
@@ -35,13 +36,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _mensajeDeError(FirebaseAuthException e) {
     switch (e.code) {
       case 'email-already-in-use':
-        return 'Ya existe una cuenta con ese correo.';
+        return tr(context, 'Ya existe una cuenta con ese correo.');
       case 'invalid-email':
-        return 'El correo no tiene un formato válido.';
+        return tr(context, 'El correo no tiene un formato válido.');
       case 'weak-password':
-        return 'La contraseña es muy débil.';
+        return tr(context, 'La contraseña es muy débil.');
       default:
-        return 'No se pudo crear la cuenta (${e.code}).';
+        return tr(context, 'No se pudo crear la cuenta (${e.code}).');
     }
   }
 
@@ -50,8 +51,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_acceptedTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content:
-                Text('Debes autorizar el tratamiento de tus datos personales')),
+            content: AppText(
+                'Debes autorizar el tratamiento de tus datos personales')),
       );
       return;
     }
@@ -88,7 +89,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear cuenta')),
+      appBar: AppBar(title: const AppText('Crear cuenta')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -98,22 +99,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Nombre completo'),
+                decoration:
+                    InputDecoration(labelText: tr(context, 'Nombre completo')),
                 validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Ingresa tu nombre'
+                    ? tr(context, 'Ingresa tu nombre')
                     : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _emailController,
-                decoration:
-                    const InputDecoration(labelText: 'Correo electrónico'),
+                decoration: InputDecoration(
+                    labelText: tr(context, 'Correo electrónico')),
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
+                  if (v == null || v.trim().isEmpty) {
+                    return tr(context, 'Ingresa tu correo');
+                  }
                   final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                  if (!emailPattern.hasMatch(v.trim()))
-                    return 'Correo no válido';
+                  if (!emailPattern.hasMatch(v.trim())) {
+                    return tr(context, 'Correo no válido');
+                  }
                   return null;
                 },
               ),
@@ -125,14 +130,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 autocorrect: false,
                 enableSuggestions: false,
                 decoration: InputDecoration(
-                  labelText: 'Contraseña',
-                  helperText: _passwordController.text.length >= 6
-                      ? 'Longitud mínima cumplida'
-                      : 'Usa al menos 6 caracteres',
+                  labelText: tr(context, 'Contraseña'),
+                  helperText: tr(
+                      context,
+                      _passwordController.text.length >= 6
+                          ? 'Longitud mínima cumplida'
+                          : 'Usa al menos 6 caracteres'),
                   suffixIcon: IconButton(
-                    tooltip: _hidePassword
-                        ? 'Mostrar contraseña'
-                        : 'Ocultar contraseña',
+                    tooltip: tr(
+                        context,
+                        _hidePassword
+                            ? 'Mostrar contraseña'
+                            : 'Ocultar contraseña'),
                     onPressed: () =>
                         setState(() => _hidePassword = !_hidePassword),
                     icon: Icon(_hidePassword
@@ -142,8 +151,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 obscureText: _hidePassword,
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Ingresa una contraseña';
-                  if (v.length < 6) return 'Debe tener al menos 6 caracteres';
+                  if (v == null || v.isEmpty) {
+                    return tr(context, 'Ingresa una contraseña');
+                  }
+                  if (v.length < 6) {
+                    return tr(context, 'Debe tener al menos 6 caracteres');
+                  }
                   return null;
                 },
               ),
@@ -153,11 +166,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 autocorrect: false,
                 enableSuggestions: false,
                 decoration: InputDecoration(
-                  labelText: 'Confirmar contraseña',
+                  labelText: tr(context, 'Confirmar contraseña'),
                   suffixIcon: IconButton(
-                    tooltip: _hideConfirmation
-                        ? 'Mostrar confirmación'
-                        : 'Ocultar confirmación',
+                    tooltip: tr(
+                        context,
+                        _hideConfirmation
+                            ? 'Mostrar confirmación'
+                            : 'Ocultar confirmación'),
                     onPressed: () =>
                         setState(() => _hideConfirmation = !_hideConfirmation),
                     icon: Icon(_hideConfirmation
@@ -167,18 +182,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 obscureText: _hideConfirmation,
                 validator: (v) => (v != _passwordController.text)
-                    ? 'Las contraseñas no coinciden'
+                    ? tr(context, 'Las contraseñas no coinciden')
                     : null,
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 8),
-                Text(_errorMessage!,
+                AppText(_errorMessage!,
                     style: const TextStyle(color: Colors.red, fontSize: 13)),
               ],
               CheckboxListTile(
                 value: _acceptedTerms,
                 onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
-                title: const Text(
+                title: const AppText(
                     'Autorizo el tratamiento de mis datos personales'),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,

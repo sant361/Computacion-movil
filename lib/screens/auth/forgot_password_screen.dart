@@ -1,3 +1,4 @@
+import '../../l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../widgets/primary_button.dart';
@@ -26,10 +27,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
     setState(() => _loading = true);
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text.trim());
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(email: _emailController.text.trim());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Enlace enviado a ${_emailController.text}')),
+        SnackBar(content: AppText('Enlace enviado a ${_emailController.text}')),
       );
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
@@ -37,7 +39,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       final mensaje = e.code == 'user-not-found'
           ? 'No existe una cuenta con ese correo.'
           : 'No se pudo enviar el enlace (${e.code}).';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensaje)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: AppText(mensaje)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -46,7 +49,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Recuperar cuenta')),
+      appBar: AppBar(title: const AppText('Recuperar cuenta')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -56,12 +59,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             children: [
               TextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Correo electrónico'),
+                decoration: InputDecoration(
+                    labelText: tr(context, 'Correo electrónico')),
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
+                  if (v == null || v.trim().isEmpty) {
+                    return tr(context, 'Ingresa tu correo');
+                  }
                   final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                  if (!emailPattern.hasMatch(v.trim())) return 'Correo no válido';
+                  if (!emailPattern.hasMatch(v.trim())) {
+                    return tr(context, 'Correo no válido');
+                  }
                   return null;
                 },
               ),

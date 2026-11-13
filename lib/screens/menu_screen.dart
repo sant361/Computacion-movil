@@ -1,9 +1,11 @@
+import '../l10n/app_text.dart';
 import 'package:flutter/material.dart';
 import 'catalog/profiles_screen.dart';
 import 'catalog/my_list_screen.dart';
 import 'catalog/viewing_history_screen.dart';
 import 'catalog/parental_control_screen.dart';
 import 'admin/admin_dashboard_screen.dart';
+import 'admin/language_screen.dart';
 import 'search_screen.dart';
 import '../state/app_state.dart';
 
@@ -24,14 +26,14 @@ class MenuScreen extends StatelessWidget {
     return ListenableBuilder(
         listenable: appState,
         builder: (context, _) => Scaffold(
-              appBar: AppBar(title: const Text('Menú')),
+              appBar: AppBar(title: const AppText('Menú')),
               body: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
                   ...categorias.map(
                     (c) => Card(
                       child: ListTile(
-                        title: Text(c),
+                        title: AppText(c),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => Navigator.push(
                           context,
@@ -42,26 +44,35 @@ class MenuScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text('Tipo',
+                  const AppText('Tipo',
                       style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   const Wrap(
                     spacing: 8,
                     children: [
-                      Chip(label: Text('Películas')),
-                      Chip(label: Text('Series')),
-                      Chip(label: Text('Documentales')),
+                      Chip(label: AppText('Películas')),
+                      Chip(label: AppText('Series')),
+                      Chip(label: AppText('Documentales')),
                     ],
                   ),
                   const Divider(height: 32),
+                  ListTile(
+                    leading: const Icon(Icons.language),
+                    title: const AppText('Idioma'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const LanguageScreen())),
+                  ),
                   ListenableBuilder(
                     listenable: appState,
                     builder: (context, _) => ListTile(
                       leading: const Icon(Icons.people_outline),
-                      title: const Text('Perfiles'),
+                      title: const AppText('Perfiles'),
                       subtitle: appState.activeProfile == null
                           ? null
-                          : Text('Viendo como ${appState.activeProfile}'),
+                          : AppText('Viendo como ${appState.activeProfile}'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.push(
                           context,
@@ -71,7 +82,7 @@ class MenuScreen extends StatelessWidget {
                   ),
                   ListTile(
                     leading: const Icon(Icons.favorite_border),
-                    title: const Text('Mi lista'),
+                    title: const AppText('Mi lista'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.push(
                         context,
@@ -80,7 +91,7 @@ class MenuScreen extends StatelessWidget {
                   ),
                   ListTile(
                     leading: const Icon(Icons.history),
-                    title: const Text('Historial de reproducción'),
+                    title: const AppText('Historial de reproducción'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.push(
                         context,
@@ -92,7 +103,7 @@ class MenuScreen extends StatelessWidget {
                       .isChild)
                     ListTile(
                       leading: const Icon(Icons.shield_outlined),
-                      title: const Text('Control parental'),
+                      title: const AppText('Control parental'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.push(
                           context,
@@ -105,7 +116,7 @@ class MenuScreen extends StatelessWidget {
                           .isChild)
                     ListTile(
                       leading: const Icon(Icons.admin_panel_settings_outlined),
-                      title: const Text('Panel de administrador'),
+                      title: const AppText('Panel de administrador'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.push(
                           context,

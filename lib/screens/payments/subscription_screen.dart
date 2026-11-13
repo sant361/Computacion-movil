@@ -1,3 +1,4 @@
+import '../../l10n/app_text.dart';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -23,6 +24,7 @@ class SubscriptionScreen extends StatefulWidget {
   @override
   State<SubscriptionScreen> createState() => _SubscriptionScreenState();
 }
+
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
   static const _background = Color(0xFF07111F);
   static const _surface = Color(0xFF142338);
@@ -56,7 +58,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Editar nombre'),
+        title: const AppText('Editar nombre'),
         content: Form(
           key: formKey,
           child: TextFormField(
@@ -88,7 +90,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
+            child: const AppText('Cancelar'),
           ),
           TextButton(
             onPressed: () {
@@ -96,7 +98,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 Navigator.pop(dialogContext, editedName.trim());
               }
             },
-            child: const Text('Guardar'),
+            child: const AppText('Guardar'),
           ),
         ],
       ),
@@ -107,12 +109,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       await user.updateDisplayName(name);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nombre actualizado')),
+        const SnackBar(content: AppText('Nombre actualizado')),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo guardar el nombre. Intenta de nuevo.')),
+        const SnackBar(
+            content:
+                AppText('No se pudo guardar el nombre. Intenta de nuevo.')),
       );
     } finally {
       if (mounted) setState(() => _savingName = false);
@@ -153,7 +157,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('No se pudo cargar la foto. Intenta de nuevo.')),
+            content: AppText('No se pudo cargar la foto. Intenta de nuevo.')),
       );
     }
   }
@@ -168,20 +172,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: _surface,
-        title: const Text('¿Cancelar tu plan?',
+        title: const AppText('¿Cancelar tu plan?',
             style: TextStyle(color: Colors.white)),
-        content: const Text(
+        content: const AppText(
           'Seguirás con acceso hasta el final del periodo ya pagado. Después no se renovará.',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Mantener mi plan'),
+            child: const AppText('Mantener mi plan'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Confirmar cancelación',
+            child: const AppText('Confirmar cancelación',
                 style: TextStyle(color: _red)),
           ),
         ],
@@ -207,13 +211,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('No se pudo cancelar el plan. Intenta de nuevo.')),
+              content:
+                  AppText('No se pudo cancelar el plan. Intenta de nuevo.')),
         );
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Tu plan se cancelará al final del periodo')),
+            content: AppText('Tu plan se cancelará al final del periodo')),
       );
     }
   }
@@ -231,7 +236,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Widget _sectionTitle(String title) => Padding(
         padding: const EdgeInsets.fromLTRB(4, 28, 4, 12),
-        child: Text(title,
+        child: AppText(title,
             style: const TextStyle(
                 color: Colors.white,
                 fontSize: 17,
@@ -252,13 +257,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
           leading: Icon(icon, color: destructive ? _red : _accent),
-          title: Text(title,
+          title: AppText(title,
               style: TextStyle(
                   color: destructive ? _red : Colors.white,
                   fontWeight: FontWeight.w600)),
           subtitle: subtitle == null
               ? null
-              : Text(subtitle,
+              : AppText(subtitle,
                   style: const TextStyle(color: Colors.white60, fontSize: 12)),
           trailing: destructive
               ? null
@@ -275,7 +280,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           appBar: AppBar(
             backgroundColor: _background,
             foregroundColor: Colors.white,
-            title: const Text('Mi perfil',
+            title: const AppText('Mi perfil',
                 style: TextStyle(fontWeight: FontWeight.w700)),
           ),
           body: SafeArea(
@@ -329,7 +334,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_displayEmail,
+                      AppText(_displayEmail,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -337,17 +342,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               fontSize: 20,
                               fontWeight: FontWeight.w800)),
                       TextButton.icon(
-                        onPressed: _savingName || _user == null ? null : _editName,
+                        onPressed:
+                            _savingName || _user == null ? null : _editName,
                         icon: const Icon(Icons.edit_outlined, size: 16),
-                        label: Text(_savingName ? 'Guardando...' : 'Editar nombre'),
+                        label: AppText(
+                            _savingName ? 'Guardando...' : 'Editar nombre'),
                         style: TextButton.styleFrom(foregroundColor: _accent),
                       ),
                       const SizedBox(height: 5),
-                      const Text('Plan Estándar',
+                      const AppText('Plan Estándar',
                           style: TextStyle(
                               color: _accent, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 3),
-                      const Text('Vencimiento no disponible',
+                      const AppText('Vencimiento no disponible',
                           style:
                               TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
@@ -358,7 +365,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               TextButton.icon(
                 onPressed: _pickPhoto,
                 icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                label: const Text('Cambiar foto de perfil'),
+                label: const AppText('Cambiar foto de perfil'),
                 style: TextButton.styleFrom(foregroundColor: _accent),
               ),
               _sectionTitle('Mi plan'),
@@ -369,19 +376,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text('Estándar',
+                      const AppText('Estándar',
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.w700)),
                       const SizedBox(height: 4),
-                      const Text('Fecha de renovación por confirmar',
+                      const AppText('Fecha de renovación por confirmar',
                           style: TextStyle(color: Colors.white60)),
                       const SizedBox(height: 12),
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
                         activeTrackColor: _accent,
-                        title: const Text('Renovación automática',
+                        title: const AppText('Renovación automática',
                             style: TextStyle(color: Colors.white)),
                         value: _autoRenew,
                         onChanged: (value) =>
@@ -393,14 +400,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         style: OutlinedButton.styleFrom(
                             foregroundColor: _accent,
                             side: const BorderSide(color: _accent)),
-                        child: const Text('Cambiar plan'),
+                        child: const AppText('Cambiar plan'),
                       ),
                       OutlinedButton(
                         onPressed: _cancelPlan,
                         style: OutlinedButton.styleFrom(
                             foregroundColor: _red,
                             side: const BorderSide(color: _red)),
-                        child: const Text('Cancelar plan'),
+                        child: const AppText('Cancelar plan'),
                       ),
                     ]),
               ),

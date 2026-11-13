@@ -1,3 +1,4 @@
+import '../l10n/app_text.dart';
 import 'package:flutter/material.dart';
 
 import '../data/catalog_item.dart';
@@ -52,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildScaffold(BuildContext context, Color background) {
     if (appState.profileLocked) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Selecciona tu perfil')),
+        appBar: AppBar(title: const AppText('Selecciona tu perfil')),
         body: Center(
             child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -61,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const Icon(Icons.lock_outline, size: 48),
                     const SizedBox(height: 16),
-                    const Text('Selecciona tu perfil para continuar',
+                    const AppText('Selecciona tu perfil para continuar',
                         textAlign: TextAlign.center),
                     const SizedBox(height: 16),
                     FilledButton(
@@ -69,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const ProfilesScreen())),
-                        child: const Text('Elegir perfil')),
+                        child: const AppText('Elegir perfil')),
                   ],
                 ))),
       );
@@ -90,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
         titleSpacing: 20,
         title: const Row(
           children: [
-            Text(
+            AppText(
               '+',
               style: TextStyle(
                 color: Color(0xFFFC093F),
@@ -99,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Flexible(
-              child: Text(
+              child: AppText(
                 'Wnovelas',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -113,12 +114,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Buscar',
+            tooltip: tr(context, 'Buscar'),
             onPressed: () => _openSearch(context),
             icon: const Icon(Icons.search_rounded),
           ),
           IconButton(
-            tooltip: 'Descargas',
+            tooltip: tr(context, 'Descargas'),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const DownloadsScreen()),
@@ -126,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.download_for_offline_outlined),
           ),
           PopupMenuButton<String>(
-            tooltip: 'Más opciones',
+            tooltip: tr(context, 'Más opciones'),
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               final Widget screen;
@@ -150,17 +151,17 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(value: 'menu', child: Text('Categorías')),
+              PopupMenuItem(value: 'menu', child: AppText('Categorías')),
               PopupMenuItem(
                 value: 'notifications',
-                child: Text('Notificaciones'),
+                child: AppText('Notificaciones'),
               ),
-              PopupMenuItem(value: 'mylist', child: Text('Mi lista')),
-              PopupMenuItem(value: 'history', child: Text('Historial')),
-              PopupMenuItem(value: 'tokens', child: Text('Mis tokens')),
+              PopupMenuItem(value: 'mylist', child: AppText('Mi lista')),
+              PopupMenuItem(value: 'history', child: AppText('Historial')),
+              PopupMenuItem(value: 'tokens', child: AppText('Mis tokens')),
               PopupMenuItem(
                 value: 'subscription',
-                child: Text('Mi suscripción'),
+                child: AppText('Mi suscripción'),
               ),
             ],
           ),
@@ -175,11 +176,11 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(children: [
                 Expanded(
-                    child: Text(appState.progressSyncError!,
+                    child: AppText(appState.progressSyncError!,
                         style: const TextStyle(color: Colors.white70))),
                 TextButton(
                     onPressed: appState.retryProgressSync,
-                    child: const Text('Reintentar')),
+                    child: const AppText('Reintentar')),
               ]),
             ),
           _CategoryStrip(
@@ -246,23 +247,23 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: const Color(0xFF0B1929),
         indicatorColor: const Color(0xFF17354A),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Inicio',
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home_rounded),
+            label: tr(context, 'Inicio'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.search_rounded),
-            label: 'Buscar',
+            icon: const Icon(Icons.search_rounded),
+            label: tr(context, 'Buscar'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.file_download_outlined),
-            label: 'Descargas',
+            icon: const Icon(Icons.file_download_outlined),
+            label: tr(context, 'Descargas'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            label: 'Mi espacio',
+            icon: const Icon(Icons.person_outline_rounded),
+            label: tr(context, 'Mi espacio'),
           ),
         ],
         selectedIndex: 0,
@@ -309,7 +310,7 @@ class _CategoryStrip extends StatelessWidget {
           final category = _categories[index];
           final isSelected = category == selected;
           return ChoiceChip(
-            label: Text(category),
+            label: AppText(category),
             selected: isSelected,
             showCheckmark: false,
             onSelected: (_) => onSelected(category),
@@ -368,7 +369,7 @@ class _FeaturedCarouselState extends State<_FeaturedCarousel> {
     if (widget.items.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(24),
-        child: Text(
+        child: AppText(
           'No hay títulos disponibles por ahora.',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white70),
@@ -404,7 +405,7 @@ class _FeaturedCarouselState extends State<_FeaturedCarousel> {
                 children: [
                   if (showArrows)
                     IconButton(
-                      tooltip: 'Título anterior',
+                      tooltip: tr(context, 'Título anterior'),
                       color: Colors.white,
                       disabledColor: Colors.white24,
                       onPressed: _page > 0 ? () => _goTo(_page - 1) : null,
@@ -435,7 +436,7 @@ class _FeaturedCarouselState extends State<_FeaturedCarousel> {
                   ),
                   if (showArrows)
                     IconButton(
-                      tooltip: 'Título siguiente',
+                      tooltip: tr(context, 'Título siguiente'),
                       color: Colors.white,
                       disabledColor: Colors.white24,
                       onPressed: _page < widget.items.length - 1
@@ -537,7 +538,7 @@ class _FeaturedCard extends StatelessWidget {
                               color: const Color(0xFFFC093F),
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: const Text(
+                            child: const AppText(
                               '+WNOVELAS ORIGINAL',
                               style: TextStyle(
                                 color: Colors.white,
@@ -548,7 +549,7 @@ class _FeaturedCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Text(
+                          AppText(
                             item.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -560,7 +561,7 @@ class _FeaturedCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 9),
-                          Text(
+                          AppText(
                             '${item.year}  ·  ${item.genre}  ·  Serie',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -586,13 +587,13 @@ class _FeaturedCard extends StatelessWidget {
                                   ),
                                 ),
                                 icon: const Icon(Icons.play_arrow_rounded),
-                                label: const Text(
+                                label: const AppText(
                                   'Reproducir',
                                   style: TextStyle(fontWeight: FontWeight.w700),
                                 ),
                               ),
                               IconButton.filledTonal(
-                                tooltip: 'Ver detalles',
+                                tooltip: tr(context, 'Ver detalles'),
                                 onPressed: onTap,
                                 style: IconButton.styleFrom(
                                   foregroundColor: Colors.white,
@@ -646,7 +647,7 @@ class _PosterSection extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text(
+                child: AppText(
                   title,
                   style: const TextStyle(
                     color: Colors.white,
@@ -662,7 +663,7 @@ class _PosterSection extends StatelessWidget {
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
-                child: Text(action),
+                child: AppText(action),
               ),
             ],
           ),
@@ -670,13 +671,14 @@ class _PosterSection extends StatelessWidget {
         if (subtitle != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-            child:
-                Text(subtitle!, style: const TextStyle(color: Colors.white70)),
+            child: AppText(subtitle!,
+                style: const TextStyle(color: Colors.white70)),
           ),
         if (items.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Text('Explora el catálogo para volver a ver tus favoritos.',
+            child: AppText(
+                'Explora el catálogo para volver a ver tus favoritos.',
                 style: TextStyle(color: Colors.white70)),
           )
         else
@@ -730,7 +732,7 @@ class _PosterSection extends StatelessWidget {
                                           Colors.black.withValues(alpha: 0.35),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    child: const Text(
+                                    child: const AppText(
                                       '+W',
                                       style: TextStyle(
                                         color: Colors.white,
@@ -755,7 +757,7 @@ class _PosterSection extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
+                        AppText(
                           item.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -766,7 +768,7 @@ class _PosterSection extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 3),
-                        Text(
+                        AppText(
                           '${item.genre}  ·  ${item.year}',
                           style: const TextStyle(
                             color: Colors.white54,
@@ -801,7 +803,7 @@ class _ContinueWatchingSection extends StatelessWidget {
       children: [
         const Padding(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
-          child: Text(
+          child: AppText(
             'Seguir viendo',
             style: TextStyle(
               color: Colors.white,
@@ -881,7 +883,7 @@ class _ContinueWatchingSection extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 7),
-                      Text(
+                      AppText(
                         item.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -917,7 +919,7 @@ class _CategoryGrid extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 48),
         child: Center(
-          child: Text(
+          child: AppText(
             'No hay contenido en esta categoría todavía',
             style: TextStyle(color: Colors.white54),
           ),
@@ -967,7 +969,7 @@ class _CategoryGrid extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                AppText(
                   item.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -978,7 +980,7 @@ class _CategoryGrid extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
+                AppText(
                   '${item.genre}  ·  ${item.year}',
                   style: const TextStyle(color: Colors.white54, fontSize: 11),
                 ),

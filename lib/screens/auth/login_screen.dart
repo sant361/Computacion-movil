@@ -1,3 +1,4 @@
+import '../../l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import '../../state/app_state.dart';
 import '../home_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
+import '../admin/language_screen.dart';
 
 const _demoEmail = 'usuario_demo@correo.com';
 const _demoPassword = 'Demo1234';
@@ -44,18 +46,18 @@ class _LoginScreenState extends State<LoginScreen> {
   String _mensajeDeError(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
-        return 'No existe una cuenta con ese correo.';
+        return tr(context, 'No existe una cuenta con ese correo.');
       case 'wrong-password':
       case 'invalid-credential':
-        return 'Correo o contraseña incorrectos.';
+        return tr(context, 'Correo o contraseña incorrectos.');
       case 'invalid-email':
-        return 'El correo no tiene un formato válido.';
+        return tr(context, 'El correo no tiene un formato válido.');
       case 'user-disabled':
-        return 'Esta cuenta fue deshabilitada.';
+        return tr(context, 'Esta cuenta fue deshabilitada.');
       case 'too-many-requests':
-        return 'Demasiados intentos. Intenta de nuevo más tarde.';
+        return tr(context, 'Demasiados intentos. Intenta de nuevo más tarde.');
       default:
-        return 'No se pudo iniciar sesión (${e.code}).';
+        return tr(context, 'No se pudo iniciar sesión (${e.code}).');
     }
   }
 
@@ -114,31 +116,41 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(actions: [
+        IconButton(
+          tooltip: tr(context, 'Idioma'),
+          onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const LanguageScreen())),
+          icon: const Icon(Icons.language),
+        ),
+      ]),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: ListView(
+              shrinkWrap: true,
               children: [
                 const SizedBox(height: 24),
-                const Text('Login',
+                const AppText('Login',
                     style:
                         TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 24),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.person_outline),
-                    labelText: 'Correo electrónico',
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.person_outline),
+                    labelText: tr(context, 'Correo electrónico'),
                   ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return 'Ingresa tu correo';
+                      return tr(context, 'Ingresa tu correo');
                     }
-                    if (!v.contains('@')) return 'Ingresa un correo válido';
+                    if (!v.contains('@')) {
+                      return tr(context, 'Ingresa un correo válido');
+                    }
                     return null;
                   },
                 ),
@@ -148,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.lock_outline),
-                    labelText: 'Password',
+                    labelText: tr(context, 'Password'),
                     suffixIcon: IconButton(
                       icon: Icon(_obscurePassword
                           ? Icons.visibility_off
@@ -158,14 +170,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Ingresa tu contraseña';
-                    if (v.length < 6) return 'Debe tener al menos 6 caracteres';
+                    if (v == null || v.isEmpty) {
+                      return tr(context, 'Ingresa tu contraseña');
+                    }
+                    if (v.length < 6) {
+                      return tr(context, 'Debe tener al menos 6 caracteres');
+                    }
                     return null;
                   },
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 8),
-                  Text(_errorMessage!,
+                  AppText(_errorMessage!,
                       style: const TextStyle(color: Colors.red, fontSize: 13)),
                 ],
                 Align(
@@ -176,13 +192,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       MaterialPageRoute(
                           builder: (_) => const ForgotPasswordScreen()),
                     ),
-                    child: const Text('¿Olvidaste tu contraseña?'),
+                    child: const AppText('¿Olvidaste tu contraseña?'),
                   ),
                 ),
                 CheckboxListTile(
                   value: _rememberMe,
                   onChanged: (v) => setState(() => _rememberMe = v ?? false),
-                  title: const Text('Recordarme'),
+                  title: const AppText('Recordarme'),
                   controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -194,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 OutlinedButton(
                   onPressed:
                       _autofill, // req. 2 — autocompletar datos de prueba.
-                  child: const Text('Autocompletar datos'),
+                  child: const AppText('Autocompletar datos'),
                 ),
                 const SizedBox(height: 24),
                 Center(
@@ -203,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       context,
                       MaterialPageRoute(builder: (_) => const RegisterScreen()),
                     ),
-                    child: const Text('¿No tienes cuenta? Regístrate'),
+                    child: const AppText('¿No tienes cuenta? Regístrate'),
                   ),
                 ),
               ],

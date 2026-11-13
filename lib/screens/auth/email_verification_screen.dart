@@ -1,3 +1,4 @@
+import '../../l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -15,7 +16,8 @@ class EmailVerificationScreen extends StatefulWidget {
   const EmailVerificationScreen({super.key, required this.email});
 
   @override
-  State<EmailVerificationScreen> createState() => _EmailVerificationScreenState();
+  State<EmailVerificationScreen> createState() =>
+      _EmailVerificationScreenState();
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
@@ -24,11 +26,13 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   bool _checking = false;
   bool _resending = false;
 
-  User? get _user => kIsWeb && _demoAuthEnabled ? null : FirebaseAuth.instance.currentUser;
+  User? get _user =>
+      kIsWeb && _demoAuthEnabled ? null : FirebaseAuth.instance.currentUser;
 
   void _showMessage(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: AppText(text)));
   }
 
   Future<void> _checkVerified() async {
@@ -42,7 +46,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       await user.reload();
       final fresh = FirebaseAuth.instance.currentUser;
       if (fresh == null || !fresh.emailVerified) {
-        _showMessage('Todavía no vemos tu correo verificado. Abre el enlace del correo y vuelve a intentar.');
+        _showMessage(
+            'Todavía no vemos tu correo verificado. Abre el enlace del correo y vuelve a intentar.');
         return;
       }
       await appState.login();
@@ -95,11 +100,13 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               const SizedBox(height: 32),
               const Icon(Icons.mark_email_unread_outlined, size: 48),
               const SizedBox(height: 16),
-              const Text('Verifica tu correo', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const AppText('Verifica tu correo',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Enviamos un enlace de verificación a ${widget.email}', textAlign: TextAlign.center),
+              AppText('Enviamos un enlace de verificación a ${widget.email}',
+                  textAlign: TextAlign.center),
               const SizedBox(height: 8),
-              const Text(
+              const AppText(
                 'Abre el correo, toca el enlace y vuelve aquí. Si no lo ves, revisa la carpeta de spam.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey),
@@ -112,7 +119,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
               const SizedBox(height: 16),
               TextButton(
                 onPressed: _resending ? null : _resend,
-                child: Text(_resending ? 'Enviando...' : '¿No llegó el correo? Reenviar enlace'),
+                child: AppText(_resending
+                    ? 'Enviando...'
+                    : '¿No llegó el correo? Reenviar enlace'),
               ),
             ],
           ),

@@ -19,6 +19,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _acceptedTerms = false;
   bool _loading = false;
+  bool _hidePassword = true;
+  bool _hideConfirmation = true;
   String? _errorMessage;
 
   @override
@@ -47,7 +49,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_acceptedTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Debes autorizar el tratamiento de tus datos personales')),
+        const SnackBar(
+            content:
+                Text('Debes autorizar el tratamiento de tus datos personales')),
       );
       return;
     }
@@ -58,7 +62,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
@@ -69,7 +74,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => EmailVerificationScreen(email: _emailController.text.trim())),
+        MaterialPageRoute(
+            builder: (_) =>
+                EmailVerificationScreen(email: _emailController.text.trim())),
       );
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _mensajeDeError(e));
@@ -92,25 +99,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(labelText: 'Nombre completo'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Ingresa tu nombre' : null,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Ingresa tu nombre'
+                    : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Correo electrónico'),
+                decoration:
+                    const InputDecoration(labelText: 'Correo electrónico'),
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
                   final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                  if (!emailPattern.hasMatch(v.trim())) return 'Correo no válido';
+                  if (!emailPattern.hasMatch(v.trim()))
+                    return 'Correo no válido';
                   return null;
                 },
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Contraseña'),
-                obscureText: true,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: InputDecoration(
+                  labelText: 'Contraseña',
+                  helperText: _passwordController.text.length >= 6
+                      ? 'Longitud mínima cumplida'
+                      : 'Usa al menos 6 caracteres',
+                  suffixIcon: IconButton(
+                    tooltip: _hidePassword
+                        ? 'Mostrar contraseña'
+                        : 'Ocultar contraseña',
+                    onPressed: () =>
+                        setState(() => _hidePassword = !_hidePassword),
+                    icon: Icon(_hidePassword
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                  ),
+                ),
+                obscureText: _hidePassword,
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Ingresa una contraseña';
                   if (v.length < 6) return 'Debe tener al menos 6 caracteres';
@@ -120,19 +150,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _confirmPasswordController,
-                decoration: const InputDecoration(labelText: 'Confirmar contraseña'),
-                obscureText: true,
-                validator: (v) =>
-                    (v != _passwordController.text) ? 'Las contraseñas no coinciden' : null,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: InputDecoration(
+                  labelText: 'Confirmar contraseña',
+                  suffixIcon: IconButton(
+                    tooltip: _hideConfirmation
+                        ? 'Mostrar confirmación'
+                        : 'Ocultar confirmación',
+                    onPressed: () =>
+                        setState(() => _hideConfirmation = !_hideConfirmation),
+                    icon: Icon(_hideConfirmation
+                        ? Icons.visibility_off
+                        : Icons.visibility),
+                  ),
+                ),
+                obscureText: _hideConfirmation,
+                validator: (v) => (v != _passwordController.text)
+                    ? 'Las contraseñas no coinciden'
+                    : null,
               ),
               if (_errorMessage != null) ...[
                 const SizedBox(height: 8),
-                Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                Text(_errorMessage!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13)),
               ],
               CheckboxListTile(
                 value: _acceptedTerms,
                 onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
-                title: const Text('Autorizo el tratamiento de mis datos personales'),
+                title: const Text(
+                    'Autorizo el tratamiento de mis datos personales'),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),

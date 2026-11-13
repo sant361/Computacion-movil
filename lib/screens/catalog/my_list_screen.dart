@@ -6,6 +6,25 @@ import '../content_detail_screen.dart';
 class MyListScreen extends StatelessWidget {
   const MyListScreen({super.key});
 
+  void _remove(BuildContext context, String title) {
+    final scope = appState.playbackScope;
+    appState.toggleMyList(title);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      content: Text('Se quitó "$title" de Mi lista.'),
+      action: SnackBarAction(
+        label: 'Deshacer',
+        onPressed: () {
+          // Una notificación antigua nunca debe modificar otro perfil o cuenta.
+          if (appState.playbackScope == scope && !appState.isInMyList(title)) {
+            appState.toggleMyList(title);
+          }
+        },
+      ),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: appState,
@@ -43,7 +62,7 @@ class MyListScreen extends StatelessWidget {
                         trailing: IconButton(
                             tooltip: 'Quitar ${item.title} de Mi lista',
                             icon: const Icon(Icons.favorite),
-                            onPressed: () => appState.toggleMyList(item.title)),
+                            onPressed: () => _remove(context, item.title)),
                       );
                     }),
           );

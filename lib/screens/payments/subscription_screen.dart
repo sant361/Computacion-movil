@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import '../../l10n/app_text.dart';
 import 'dart:convert';
 
@@ -26,10 +27,10 @@ class SubscriptionScreen extends StatefulWidget {
 }
 
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
-  static const _background = Color(0xFF07111F);
-  static const _surface = Color(0xFF142338);
-  static const _accent = Color(0xFF35D0C4);
-  static const _red = Color(0xFFFC093F);
+  static const _background = AppColors.background;
+  static const _surface = AppColors.surface;
+  static const _accent = AppColors.accent;
+  static const _red = AppColors.brand;
   static const _demoAuthEnabled = bool.fromEnvironment('DEMO_AUTH_ENABLED');
 
   bool _autoRenew = true;

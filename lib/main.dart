@@ -1,3 +1,4 @@
+import 'theme/app_theme.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -34,10 +35,7 @@ class StreamingApp extends StatelessWidget {
                 ...GlobalMaterialLocalizations.delegates
               ],
               debugShowCheckedModeBanner: false,
-              theme: ThemeData(
-                colorSchemeSeed: const Color(0xFF3D5A80),
-                useMaterial3: true,
-              ),
+              theme: AppTheme.dark,
               home: const AppStartup(),
             ));
   }

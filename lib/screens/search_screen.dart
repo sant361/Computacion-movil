@@ -1,3 +1,4 @@
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../data/catalog_item.dart';
 import '../state/app_state.dart';
@@ -28,9 +29,9 @@ enum _DurationBucket {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  static const background = Color(0xFF07111F);
-  static const surface = Color(0xFF142338);
-  static const accent = Color(0xFF35D0C4);
+  static const background = AppColors.background;
+  static const surface = AppColors.surface;
+  static const accent = AppColors.accent;
   final _queryController = TextEditingController();
   final _selectedGenres = <String>{};
   final _selectedYears = <int>{};

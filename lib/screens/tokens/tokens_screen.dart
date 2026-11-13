@@ -17,30 +17,36 @@ class TokensScreen extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           children: [
             Card(
-              color: const Color(0xFFF7F3E9),
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
               child: ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Color(0xFFEBC86E),
-                  child: Text('T', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text('T',
+                      style: TextStyle(
+                          color: Colors.black, fontWeight: FontWeight.bold)),
                 ),
-                title: const Text('Saldo disponible', style: TextStyle(color: Colors.grey)),
+                title: const Text('Saldo disponible',
+                    style: TextStyle(color: Colors.grey)),
                 subtitle: Text('${appState.tokenBalance} tokens',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 16),
             OutlinedButton(
-              onPressed: () =>
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const EarnTokensScreen())),
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const EarnTokensScreen())),
               child: const Text('Ver anuncio y ganar tokens'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())),
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const GamesScreen())),
               child: const Text('Ganar tokens con juegos'),
             ),
             const Divider(height: 32),
-            const Text('Historial reciente', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Historial reciente',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             ...appState.tokenHistory.map(
               (h) => ListTile(
                 title: Text(h['titulo']!),
@@ -48,7 +54,8 @@ class TokensScreen extends StatelessWidget {
                   h['valor']!,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: h['valor']!.startsWith('+') ? Colors.green : Colors.red,
+                    color:
+                        h['valor']!.startsWith('+') ? Colors.green : Colors.red,
                   ),
                 ),
                 contentPadding: EdgeInsets.zero,

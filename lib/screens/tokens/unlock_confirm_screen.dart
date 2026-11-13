@@ -33,10 +33,13 @@ class UnlockConfirmScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        Text(chapterName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(chapterName,
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         Text('Costo: $cost tokens'),
-                        Text('Saldo actual: ${appState.tokenBalance}', style: const TextStyle(color: Colors.grey)),
+                        Text('Saldo actual: ${appState.tokenBalance}',
+                            style: const TextStyle(color: Colors.grey)),
                       ],
                     ),
                   ),
@@ -49,7 +52,9 @@ class UnlockConfirmScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: canAfford ? Colors.black : Colors.red,
+                    color: canAfford
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Theme.of(context).colorScheme.error,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -66,9 +71,11 @@ class UnlockConfirmScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: canAfford
                             ? () {
-                                appState.spendTokens(cost, reason: 'Desbloqueo $chapterName');
+                                appState.spendTokens(cost,
+                                    reason: 'Desbloqueo $chapterName');
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Capítulo desbloqueado')),
+                                  const SnackBar(
+                                      content: Text('Capítulo desbloqueado')),
                                 );
                                 Navigator.pop(context);
                               }

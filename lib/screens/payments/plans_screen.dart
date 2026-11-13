@@ -26,7 +26,10 @@ class _PlansScreenState extends State<PlansScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      await FirebaseFirestore.instance.collection('subscriptions').doc(user.uid).set({
+      await FirebaseFirestore.instance
+          .collection('subscriptions')
+          .doc(user.uid)
+          .set({
         'plan': planes[_selected]['nombre'],
         'autoRenew': true,
         'cancelAtPeriodEnd': false,
@@ -53,7 +56,10 @@ class _PlansScreenState extends State<PlansScreen> {
                 itemBuilder: (_, i) => Card(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
-                    side: BorderSide(color: _selected == i ? Colors.black : Colors.grey.shade300),
+                    side: BorderSide(
+                        color: _selected == i
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outline),
                   ),
                   child: RadioListTile(
                     value: i,
@@ -76,7 +82,8 @@ class _PlansScreenState extends State<PlansScreen> {
               onPressed: () async {
                 await _saveSubscription();
                 if (!context.mounted) return;
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentScreen()));
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const PaymentScreen()));
               },
             ),
           ],

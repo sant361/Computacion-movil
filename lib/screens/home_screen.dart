@@ -1,3 +1,4 @@
+import '../theme/app_theme.dart';
 import '../l10n/app_text.dart';
 import 'package:flutter/material.dart';
 
@@ -42,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const background = Color(0xFF07111F);
+    const background = AppColors.background;
 
     return ListenableBuilder(
       listenable: appState,
@@ -94,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
             AppText(
               '+',
               style: TextStyle(
-                color: Color(0xFFFC093F),
+                color: AppColors.brand,
                 fontWeight: FontWeight.w800,
                 fontSize: 20,
               ),
@@ -244,8 +245,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        backgroundColor: const Color(0xFF0B1929),
-        indicatorColor: const Color(0xFF17354A),
+        backgroundColor: AppColors.navigation,
+        indicatorColor: AppColors.selectedNavigation,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: [
           NavigationDestination(
@@ -315,11 +316,11 @@ class _CategoryStrip extends StatelessWidget {
             showCheckmark: false,
             onSelected: (_) => onSelected(category),
             labelStyle: TextStyle(
-              color: isSelected ? const Color(0xFF07111F) : Colors.white70,
+              color: isSelected ? AppColors.background : Colors.white70,
               fontWeight: FontWeight.w600,
             ),
-            selectedColor: const Color(0xFF35D0C4),
-            backgroundColor: const Color(0xFF142338),
+            selectedColor: AppColors.accent,
+            backgroundColor: AppColors.surface,
             side: BorderSide.none,
             padding: const EdgeInsets.symmetric(horizontal: 5),
           );
@@ -427,7 +428,7 @@ class _FeaturedCarouselState extends State<_FeaturedCarousel> {
                               size: index == _page ? 12 : 8,
                             ),
                             color: index == _page
-                                ? const Color(0xFF35D0C4)
+                                ? AppColors.accent
                                 : Colors.white38,
                           ),
                         ),
@@ -535,7 +536,7 @@ class _FeaturedCard extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFC093F),
+                              color: AppColors.brand,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: const AppText(
@@ -580,7 +581,7 @@ class _FeaturedCard extends StatelessWidget {
                                 onPressed: onTap,
                                 style: FilledButton.styleFrom(
                                   backgroundColor: Colors.white,
-                                  foregroundColor: const Color(0xFF07111F),
+                                  foregroundColor: AppColors.background,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 20,
                                     vertical: 12,
@@ -659,7 +660,7 @@ class _PosterSection extends StatelessWidget {
               TextButton(
                 onPressed: onActionTap,
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF35D0C4),
+                  foregroundColor: AppColors.accent,
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -878,7 +879,7 @@ class _ContinueWatchingSection extends StatelessWidget {
                           minHeight: 4,
                           backgroundColor: Colors.white12,
                           valueColor: const AlwaysStoppedAnimation(
-                            Color(0xFF35D0C4),
+                            AppColors.accent,
                           ),
                         ),
                       ),

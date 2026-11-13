@@ -95,7 +95,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
+          child: ListView(
+            shrinkWrap: true,
             children: [
               const SizedBox(height: 32),
               const Icon(Icons.mark_email_unread_outlined, size: 48),

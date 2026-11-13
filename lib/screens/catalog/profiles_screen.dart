@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/services.dart';
@@ -370,24 +371,24 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: Color(0xFF07111F),
+        backgroundColor: AppColors.background,
         body: Center(
           child: CircularProgressIndicator(
-            color: Color(0xFFFC093F),
+            color: AppColors.brand,
             semanticsLabel: 'Cargando perfiles',
           ),
         ),
       );
     }
     return Theme(
-      data: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF07111F),
+      data: AppTheme.dark.copyWith(
+        scaffoldBackgroundColor: AppColors.background,
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF07111F),
+          backgroundColor: AppColors.background,
           foregroundColor: Colors.white,
         ),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFC093F),
+          seedColor: AppColors.brand,
           brightness: Brightness.dark,
         ),
       ),
@@ -539,7 +540,7 @@ class _ProfileAvatar extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
                 side: BorderSide(
-                  color: selected ? const Color(0xFFFC093F) : Colors.white24,
+                  color: selected ? AppColors.brand : Colors.white24,
                   width: selected ? 2 : 1,
                 ),
               ),

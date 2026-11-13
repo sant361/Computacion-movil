@@ -1,3 +1,4 @@
+import '../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class CatalogArtwork extends StatelessWidget {
@@ -12,7 +13,7 @@ class CatalogArtwork extends StatelessWidget {
         uri.host.isNotEmpty &&
         (uri.scheme == 'https' || uri.scheme == 'http');
     return Stack(fit: StackFit.expand, children: [
-      const ColoredBox(color: Color(0xFF142338)),
+      const ColoredBox(color: AppColors.surface),
       if (valid)
         Image.network(
           url,

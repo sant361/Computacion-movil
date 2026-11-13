@@ -9,13 +9,6 @@ import 'state/app_state.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // firebase_options.dart lo genera "flutterfire configure" automáticamente
-  // con los datos de TU proyecto de Firebase; no se edita a mano.
-  if (!kIsWeb || !const bool.fromEnvironment('DEMO_AUTH_ENABLED')) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  }
   runApp(const StreamingApp());
 }
 
@@ -31,17 +24,39 @@ class StreamingApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF3D5A80),
         useMaterial3: true,
       ),
-      home: const _AppStartup(),
+      home: const AppStartup(),
     );
   }
 }
 
 /// Carga el estado guardado (tokens, Mi lista) antes de mostrar el Login,
 /// para que la app abra ya con los datos reales del dispositivo.
-class _AppStartup extends StatelessWidget {
-  const _AppStartup();
+class AppStartup extends StatefulWidget {
+  const AppStartup({super.key, this.initialize, this.readyBuilder});
+  final Future<void> Function()? initialize;
+  final WidgetBuilder? readyBuilder;
+
+  @override
+  State<AppStartup> createState() => _AppStartupState();
+}
+
+class _AppStartupState extends State<AppStartup> {
+  late Future<void> _pending;
+
+  @override
+  void initState() {
+    super.initState();
+    _pending = _start();
+  }
+
+  Future<void> _start() => Future<void>.sync(widget.initialize ?? _startup);
 
   Future<void> _startup() async {
+    if ((!kIsWeb || !const bool.fromEnvironment('DEMO_AUTH_ENABLED')) &&
+        Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform);
+    }
     await appState.load();
     if (appState.isLoggedIn) {
       await appState.loadCatalogFromFirestore();
@@ -60,14 +75,39 @@ class _AppStartup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
-      future: _startup(),
+      future: _pending,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: SafeArea(
+                child: Center(
+                    child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.cloud_off_outlined, size: 48),
+                const SizedBox(height: 16),
+                const Text('No pudimos iniciar la aplicación',
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                const Text('Comprueba tu conexión y vuelve a intentarlo.',
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                    onPressed: () => setState(() { _pending = _start(); }),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reintentar')),
+              ]),
+            ))),
+          );
+        }
+        if (widget.readyBuilder != null) return widget.readyBuilder!(context);
         return appState.isLoggedIn ? const HomeScreen() : const LoginScreen();
       },
     );
   }
 }
+

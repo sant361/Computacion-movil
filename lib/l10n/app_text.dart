@@ -614,9 +614,9 @@ const Map<String, Map<String, String>> _translations = {
     "en": "Parental controls updated",
     "fr": "Contrôle parental mis à jour"
   },
-  "Código aplicado (demo)": {
-    "en": "Code applied (demo)",
-    "fr": "Code appliqué (démo)"
+  "Código recibido (simulado)": {
+    "en": "Code received (simulated)",
+    "fr": "Code reçu (simulé)"
   },
   "Código promocional": {"en": "Promo code", "fr": "Code promotionnel"},
   "Código reenviado": {"en": "Code resent", "fr": "Code renvoyé"},
@@ -688,9 +688,9 @@ const Map<String, Map<String, String>> _translations = {
     "en": "Monthly renewal",
     "fr": "Renouvellement mensuel"
   },
-  "Reproduciendo siguiente episodio (demo)": {
-    "en": "Playing next episode (demo)",
-    "fr": "Lecture du prochain épisode (démo)"
+  "Reproduciendo siguiente episodio (próximamente)": {
+    "en": "Playing next episode (coming soon)",
+    "fr": "Lecture du prochain épisode (bientôt)"
   },
   "Restringir por perfil": {
     "en": "Restrict by profile",
@@ -727,69 +727,69 @@ const Map<String, Map<String, String>> _translations = {
     "fr": "Pas de code ? Renvoyer le code"
   },
   "¿Quién ve ahora?": {"en": "Who is watching?", "fr": "Qui regarde ?"},
-  "Abriendo alertas de seguridad (demo)": {
-    "en": "Opening security alerts (demo)",
-    "fr": "Ouverture des alertes de sécurité (démo)"
+  "Abriendo alertas de seguridad (próximamente)": {
+    "en": "Opening security alerts (coming soon)",
+    "fr": "Ouverture des alertes de sécurité (bientôt)"
   },
-  "Abriendo dispositivos autorizados (demo)": {
-    "en": "Opening authorized devices (demo)",
-    "fr": "Ouverture des appareils autorisés (démo)"
+  "Abriendo dispositivos autorizados (próximamente)": {
+    "en": "Opening authorized devices (coming soon)",
+    "fr": "Ouverture des appareils autorisés (bientôt)"
   },
-  "Abriendo formulario de carga (demo)": {
-    "en": "Opening upload form (demo)",
-    "fr": "Ouverture du formulaire d’envoi (démo)"
+  "Abriendo formulario de carga (próximamente)": {
+    "en": "Opening upload form (coming soon)",
+    "fr": "Ouverture du formulaire d’envoi (bientôt)"
   },
-  "Abriendo panel de episodios (demo)": {
-    "en": "Opening episodes panel (demo)",
-    "fr": "Ouverture du panneau des épisodes (démo)"
+  "Abriendo panel de episodios (próximamente)": {
+    "en": "Opening episodes panel (coming soon)",
+    "fr": "Ouverture du panneau des épisodes (bientôt)"
   },
-  "Abriendo panel de temporadas (demo)": {
-    "en": "Opening seasons panel (demo)",
-    "fr": "Ouverture du panneau des saisons (démo)"
+  "Abriendo panel de temporadas (próximamente)": {
+    "en": "Opening seasons panel (coming soon)",
+    "fr": "Ouverture du panneau des saisons (bientôt)"
   },
-  "Abriendo registro de auditoría (demo)": {
-    "en": "Opening audit log (demo)",
-    "fr": "Ouverture du journal d’audit (démo)"
+  "Abriendo registro de auditoría (próximamente)": {
+    "en": "Opening audit log (coming soon)",
+    "fr": "Ouverture du journal d’audit (bientôt)"
   },
-  "Abriendo registro de errores (demo)": {
-    "en": "Opening error log (demo)",
-    "fr": "Ouverture du journal des erreurs (démo)"
+  "Abriendo registro de errores (próximamente)": {
+    "en": "Opening error log (coming soon)",
+    "fr": "Ouverture du journal des erreurs (bientôt)"
   },
-  "Contenido eliminado (demo)": {
-    "en": "Content deleted (demo)",
-    "fr": "Contenu supprimé (démo)"
+  "Contenido eliminado (próximamente)": {
+    "en": "Content deleted (coming soon)",
+    "fr": "Contenu supprimé (bientôt)"
   },
-  "Editar contenido (demo)": {
-    "en": "Edit content (demo)",
-    "fr": "Modifier le contenu (démo)"
+  "Editar contenido (próximamente)": {
+    "en": "Edit content (coming soon)",
+    "fr": "Modifier le contenu (bientôt)"
   },
-  "Editar permisos del rol (demo)": {
-    "en": "Edit role permissions (demo)",
-    "fr": "Modifier les autorisations du rôle (démo)"
+  "Editar permisos del rol (próximamente)": {
+    "en": "Edit role permissions (coming soon)",
+    "fr": "Modifier les autorisations du rôle (bientôt)"
   },
-  "Editar plan (demo)": {
-    "en": "Edit plan (demo)",
-    "fr": "Modifier l’abonnement (démo)"
+  "Editar plan (próximamente)": {
+    "en": "Edit plan (coming soon)",
+    "fr": "Modifier l’abonnement (bientôt)"
   },
-  "Formulario de código nuevo (demo)": {
-    "en": "New code form (demo)",
-    "fr": "Formulaire de nouveau code (démo)"
+  "Formulario de código nuevo (próximamente)": {
+    "en": "New code form (coming soon)",
+    "fr": "Formulaire de nouveau code (bientôt)"
   },
-  "Formulario de nueva promoción (demo)": {
-    "en": "New promotion form (demo)",
-    "fr": "Formulaire de nouvelle promotion (démo)"
+  "Formulario de nueva promoción (próximamente)": {
+    "en": "New promotion form (coming soon)",
+    "fr": "Formulaire de nouvelle promotion (bientôt)"
   },
-  "Formulario de nuevo plan (demo)": {
-    "en": "New plan form (demo)",
-    "fr": "Formulaire de nouvel abonnement (démo)"
+  "Formulario de nuevo plan (próximamente)": {
+    "en": "New plan form (coming soon)",
+    "fr": "Formulaire de nouvel abonnement (bientôt)"
   },
-  "Formulario de nuevo rol (demo)": {
-    "en": "New role form (demo)",
-    "fr": "Formulaire de nouveau rôle (démo)"
+  "Formulario de nuevo rol (próximamente)": {
+    "en": "New role form (coming soon)",
+    "fr": "Formulaire de nouveau rôle (bientôt)"
   },
-  "Plan eliminado (demo)": {
-    "en": "Plan deleted (demo)",
-    "fr": "Abonnement supprimé (démo)"
+  "Plan eliminado (próximamente)": {
+    "en": "Plan deleted (coming soon)",
+    "fr": "Abonnement supprimé (bientôt)"
   },
   "Sinopsis: descripción del contenido, lista para reemplazar con los datos reales del catálogo (reparto, director, temporadas, episodios).":
       {

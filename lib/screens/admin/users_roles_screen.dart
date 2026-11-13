@@ -46,14 +46,14 @@ class UsersRolesScreen extends StatelessWidget {
           ...roles.map(
             (r) => ListTile(
               title: Text(r),
-              trailing: TextButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editar permisos del rol (demo)'))), child: const Text('Editar')),
+              trailing: TextButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Editar permisos del rol (próximamente)'))), child: const Text('Editar')),
               contentPadding: EdgeInsets.zero,
             ),
           ),
           const SizedBox(height: 8),
-          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de nuevo rol (demo)'))), child: const Text('+ Crear rol')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Formulario de nuevo rol (próximamente)'))), child: const Text('+ Crear rol')),
           const SizedBox(height: 24),
-          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo registro de auditoría (demo)'))), child: const Text('Registro de auditoría')),
+          OutlinedButton(onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Abriendo registro de auditoría (próximamente)'))), child: const Text('Registro de auditoría')),
         ],
       ),
     );

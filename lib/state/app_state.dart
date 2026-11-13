@@ -1011,7 +1011,7 @@ class AppState extends ChangeNotifier {
       _currentFavorites.contains(contentTitle);
 
   // Descargas: por simplicidad se marcan como completas al instante
-  // (no hay una descarga real en progreso, es solo para la demo).
+  // (la app no guarda archivos de video sin conexión).
   final Set<String> _downloads = {};
   List<String> get downloads => List.unmodifiable(_downloads);
   bool isDownloaded(String contentTitle) => _downloads.contains(contentTitle);
@@ -1061,8 +1061,8 @@ class AppState extends ChangeNotifier {
   }
 
   /// Marca la sesión como iniciada y lo recuerda en el dispositivo.
-  /// TODO: cuando haya backend real, aquí se validarían las credenciales
-  /// y se guardaría el token de sesión en vez de solo un booleano.
+  /// Las credenciales las valida Firebase Authentication antes de llamar a
+  /// este método; aquí solo se recuerda que la sesión está iniciada.
   Future<void> login() async {
     _isLoggedIn = true;
     notifyListeners();

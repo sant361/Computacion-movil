@@ -43,7 +43,7 @@ class _RegionSecurityScreenState extends State<RegionSecurityScreen> {
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                       content:
-                          Text('Abriendo dispositivos autorizados (demo)'))),
+                          Text('Abriendo dispositivos autorizados (próximamente)'))),
               child: const Text('Pantalla Dispositivos')),
           const Divider(height: 32),
           Card(
@@ -64,7 +64,7 @@ class _RegionSecurityScreenState extends State<RegionSecurityScreen> {
           OutlinedButton(
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                      content: Text('Abriendo alertas de seguridad (demo)'))),
+                      content: Text('Abriendo alertas de seguridad (próximamente)'))),
               child: const Text('Ver alertas de seguridad')),
         ],
       ),

@@ -48,7 +48,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Código aplicado (demo)')),
+                  const SnackBar(content: Text('Código recibido (simulado)')),
                 ),
                 child: const Text('Aplicar'),
               ),

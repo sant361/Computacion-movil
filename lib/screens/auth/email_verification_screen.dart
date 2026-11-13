@@ -2,6 +2,7 @@ import '../../l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../services/user_store.dart';
 import '../../state/app_state.dart';
 import '../../widgets/primary_button.dart';
 import '../home_screen.dart';
@@ -50,6 +51,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
             'Todavía no vemos tu correo verificado. Abre el enlace del correo y vuelve a intentar.');
         return;
       }
+      await UserStore.touchOnLogin(fresh);
       await appState.login();
       await appState.loadCatalogFromFirestore();
       await appState.loadProfiles(fresh.uid);

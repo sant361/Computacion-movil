@@ -2,9 +2,11 @@ import '../../l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../services/user_store.dart';
 import '../../widgets/primary_button.dart';
 import '../../state/app_state.dart';
 import '../home_screen.dart';
+import 'email_verification_screen.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 import '../admin/language_screen.dart';
@@ -89,10 +91,25 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      final signedIn = credential.user;
+      if (signedIn != null && !signedIn.emailVerified) {
+        // La cuenta existe, pero el correo aún no se confirma: se pide
+        // verificarlo antes de dejar entrar (la sesión queda abierta para
+        // poder comprobar y reenviar el enlace).
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (_) => EmailVerificationScreen(
+                  email: signedIn.email ?? _emailController.text.trim())),
+        );
+        return;
+      }
+      if (signedIn != null) await UserStore.touchOnLogin(signedIn);
       await appState.login();
       await appState.loadCatalogFromFirestore();
       await appState

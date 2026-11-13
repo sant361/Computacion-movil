@@ -1,6 +1,7 @@
 import '../../l10n/app_text.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../services/user_store.dart';
 import '../../widgets/primary_button.dart';
 import 'email_verification_screen.dart';
 
@@ -69,6 +70,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _passwordController.text,
       );
       await credential.user?.updateDisplayName(_nameController.text.trim());
+      final newUser = credential.user;
+      if (newUser != null) {
+        await UserStore.saveOnRegister(newUser, _nameController.text.trim());
+      }
       // Firebase ya puede enviar un correo de verificación real:
       await credential.user?.sendEmailVerification();
 

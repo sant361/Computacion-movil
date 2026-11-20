@@ -6,3 +6,7 @@ build/
 .vscode/
 ios/Pods/
 android/.gradle/
+
+# Archivos generados o temporales
+*.patch
+.flutter-plugins-dependencies
